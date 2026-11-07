@@ -2091,6 +2091,9 @@ func _process(delta: float) -> void:
 		for id in station_order:
 			refresh_station(id)
 		ui_hint.text = hint_text()
+		# keep the seed grid out from under menus and panels on short (landscape) screens
+		seed_box.visible = not (menu_panel.visible or upg_panel.visible or orders_panel.visible or quests_panel.visible or help_panel.visible)
+		(ui_hint.get_parent() as Control).visible = seed_box.visible
 	save_timer -= delta
 	if save_timer <= 0:
 		save_timer = 5.0
@@ -2288,22 +2291,23 @@ func build_ui() -> void:
 	menu_panel.offset_top = 86
 	menu_panel.visible = false
 	root.add_child(menu_panel)
-	var mv := VBoxContainer.new()
-	mv.add_theme_constant_override("separation", 8)
+	var mv := GridContainer.new()
+	mv.columns = 2
+	mv.add_theme_constant_override("h_separation", 8)
+	mv.add_theme_constant_override("v_separation", 8)
 	menu_panel.add_child(mv)
 	orders_btn = menu_item(mv, "Orders", func(): build_orders_panel(); orders_panel.visible = true; upg_panel.visible = false; quests_panel.visible = false)
 	quests_btn = menu_item(mv, "Quests", func(): build_quests_panel(); quests_panel.visible = true; upg_panel.visible = false; orders_panel.visible = false)
 	menu_item(mv, "Upgrades", func(): build_upgrade_panel(); upg_panel.visible = true; orders_panel.visible = false; quests_panel.visible = false)
 	menu_item(mv, "Help", func(): show_help(0))
-	var zr := HBoxContainer.new()
-	zr.add_theme_constant_override("separation", 8)
-	mv.add_child(zr)
 	var zi := big_button("Zoom +")
+	zi.custom_minimum_size = Vector2(170, 60)
 	zi.pressed.connect(func(): zoom(-0.15))
-	zr.add_child(zi)
+	mv.add_child(zi)
 	var zo := big_button("Zoom -")
+	zo.custom_minimum_size = Vector2(170, 60)
 	zo.pressed.connect(func(): zoom(0.15))
-	zr.add_child(zo)
+	mv.add_child(zo)
 	menu_item(mv, "Pause", func(): set_paused(true))
 
 	seed_box = GridContainer.new()
@@ -2705,7 +2709,7 @@ func big_button(text: String) -> Button:
 ## A full-width button in the drop-down menu; closes the menu when pressed.
 func menu_item(parent: Control, text: String, action: Callable) -> Button:
 	var b := big_button(text)
-	b.custom_minimum_size = Vector2(220, 60)
+	b.custom_minimum_size = Vector2(170, 60)
 	b.pressed.connect(func(): menu_panel.visible = false; action.call())
 	parent.add_child(b)
 	return b
@@ -2763,7 +2767,7 @@ func build_upgrade_panel() -> void:
 	grid.add_theme_constant_override("v_separation", 10)
 	upg_box.add_child(grid)
 	var sc := ScrollContainer.new()
-	sc.custom_minimum_size = Vector2(900, 440)
+	sc.custom_minimum_size = Vector2(900, 340)
 	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	upg_box.add_child(sc)
 	grid.reparent(sc)
@@ -2833,6 +2837,10 @@ func refresh_ui() -> void:
 				row = []
 	if row.size() > 0:
 		lines.append(row[0])
+	if lines.size() > 6:
+		var hidden := lines.size() - 5
+		lines = lines.slice(0, 5)
+		lines.append("+%d more lines" % hidden)
 	ui_inv.text = "\n".join(lines) if lines.size() > 0 else "(basket empty)"
 	refresh_pen_signs()
 	refresh_sale_sign()
@@ -3147,7 +3155,7 @@ func build_quests_panel() -> void:
 	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	quests_box.add_child(t)
 	var sc := ScrollContainer.new()
-	sc.custom_minimum_size = Vector2(600, 440)
+	sc.custom_minimum_size = Vector2(600, 400)
 	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	quests_box.add_child(sc)
 	var list := VBoxContainer.new()
