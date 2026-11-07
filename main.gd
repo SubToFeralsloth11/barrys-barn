@@ -72,8 +72,8 @@ var seen_help := false
 # --- runtime ---
 var mats := {}
 var cam: Camera3D
-var cam_target := Vector3(1, 0, 0)
-var cam_zoom := 1.0
+var cam_target := Vector3(-1, 0, 3.0)
+var cam_zoom := 1.2
 var press_pos := Vector2.ZERO
 var pressing := false
 var dragging := false
@@ -94,7 +94,7 @@ var ui_level: Label
 var ui_xp: ProgressBar
 var ui_inv: Label
 var ui_toast: Label
-var seed_box: HBoxContainer
+var seed_box: VBoxContainer
 var upg_panel: PanelContainer
 var upg_box: VBoxContainer
 var help_panel: PanelContainer
@@ -301,13 +301,14 @@ func build_world() -> void:
 	e.background_color = Color(0.55, 0.8, 1.0)
 	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	e.ambient_light_color = Color(0.85, 0.88, 1.0)
-	e.ambient_light_energy = 0.6
+	e.ambient_light_energy = 0.35
+	e.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.environment = e
 	add_child(env)
 
 	var sun := DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-55, -35, 0)
-	sun.light_energy = 1.1
+	sun.light_energy = 1.0
 	sun.shadow_enabled = true
 	sun.directional_shadow_max_distance = 60.0
 	add_child(sun)
@@ -318,7 +319,7 @@ func build_world() -> void:
 	update_camera()
 
 	# ground, road
-	box(self, Vector3(140, 1, 120), Vector3(0, -0.5, 0), Color(0.45, 0.75, 0.35))
+	box(self, Vector3(140, 1, 120), Vector3(0, -0.5, 0), Color(0.36, 0.64, 0.26))
 	box(self, Vector3(140, 0.06, 4.6), Vector3(0, 0.03, 11.2), Color(0.3, 0.3, 0.33))
 	for i in 28:
 		box(self, Vector3(1.8, 0.07, 0.18), Vector3(-67 + i * 5, 0.04, 11.2), Color(1, 0.95, 0.6))
@@ -421,8 +422,8 @@ func build_pen() -> void:
 		var id: String = ANIMAL_ORDER[i]
 		var sn := node_at(self, Vector3(2.5 + i * 5.0, 0, -2.4))
 		box(sn, Vector3(0.12, 1.2, 0.12), Vector3(0, 0.6, 0), WOOD)
-		box(sn, Vector3(1.6, 0.8, 0.1), Vector3(0, 1.4, 0), Color(0.95, 0.9, 0.75))
-		var l := label3d(sn, "", Vector3(0, 1.4, 0.08), 26, false)
+		box(sn, Vector3(2.4, 1.0, 0.1), Vector3(0, 1.4, 0), Color(0.95, 0.9, 0.75))
+		var l := label3d(sn, "", Vector3(0, 1.4, 0.08), 34, false)
 		l.modulate = Color(0.2, 0.12, 0.05)
 		l.outline_size = 0
 		add_hit(sn, Vector3(1.8, 1.8, 0.8), Vector3(0, 1.0, 0), "buy_animal", id)
@@ -861,7 +862,7 @@ func spawn_car() -> void:
 	var weights := []
 	var total := 0.0
 	for g in goods:
-		var w := 1.0 + ITEMS[g]["p"] / 10.0
+		var w: float = 1.0 + ITEMS[g]["p"] / 10.0
 		if have(g) > 0:
 			w *= 3.0
 		weights.append(w)
@@ -1210,23 +1211,21 @@ func build_ui() -> void:
 	var hb := big_button(" ? ")
 	hb.pressed.connect(func(): help_panel.visible = not help_panel.visible; upg_panel.visible = false)
 	tr.add_child(hb)
-	var zv := VBoxContainer.new()
-	zv.set_anchors_and_offsets_preset(Control.PRESET_CENTER_RIGHT)
-	zv.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	zv.offset_right = -12
-	root.add_child(zv)
+
 	var zi := big_button(" + ")
 	zi.pressed.connect(func(): zoom(-0.15))
-	zv.add_child(zi)
+	tr.add_child(zi)
+	tr.move_child(zi, 0)
 	var zo := big_button(" - ")
 	zo.pressed.connect(func(): zoom(0.15))
-	zv.add_child(zo)
+	tr.add_child(zo)
+	tr.move_child(zo, 1)
 
-	seed_box = HBoxContainer.new()
-	seed_box.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
-	seed_box.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	seed_box.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	seed_box.offset_bottom = -14
+	seed_box = VBoxContainer.new()
+	seed_box.set_anchors_and_offsets_preset(Control.PRESET_CENTER_RIGHT)
+	seed_box.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	seed_box.grow_vertical = Control.GROW_DIRECTION_BOTH
+	seed_box.offset_right = -12
 	seed_box.add_theme_constant_override("separation", 10)
 	root.add_child(seed_box)
 	build_seed_bar()
@@ -1261,7 +1260,7 @@ func build_ui() -> void:
 	var body := Label.new()
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.custom_minimum_size = Vector2(620, 0)
-	body.text = "- Tap a dirt plot to plant the seed picked at the bottom.\n- Tap bouncing crops to harvest (they replant by themselves).\n- Tap animals when an egg or milk floats over them.\n- Build stations to turn crops into tastier goods.\n- Cars stop at your stand. Tap a car to sell what it wants before it gets bored!\n- Level up to unlock new seeds, animals and stations.\n- Drag to look around, use + / - to zoom."
+	body.text = "- Pick a seed on the right, then tap a dirt plot to plant it.\n- Tap bouncing crops to harvest (they replant by themselves).\n- Tap animals when an egg or milk floats over them.\n- Build stations to turn crops into tastier goods.\n- Cars stop at your stand. Tap a car to sell what it wants before it gets bored!\n- Level up to unlock new seeds, animals and stations.\n- Drag to look around, use + / - to zoom."
 	hv.add_child(body)
 	var ok := big_button("Let's farm!")
 	ok.pressed.connect(func(): help_panel.visible = false; seen_help = true; save_game())
