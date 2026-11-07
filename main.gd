@@ -19,8 +19,11 @@ const ITEMS := {
 	"bread": {"n": "Bread", "p": 28, "c": Color(0.85, 0.6, 0.35)},
 	"popcorn": {"n": "Popcorn", "p": 32, "c": Color(1.0, 0.98, 0.8)},
 	"pie": {"n": "Pumpkin Pie", "p": 85, "c": Color(0.95, 0.55, 0.2)},
+	"golden": {"n": "Golden Crop", "p": 40, "c": Color(1.0, 0.8, 0.15)},
+	"apple": {"n": "Apple", "p": 9, "c": Color(0.9, 0.15, 0.15)},
+	"cider": {"n": "Apple Cider", "p": 45, "c": Color(0.85, 0.55, 0.2)},
 }
-const ITEM_ORDER := ["wheat", "carrot", "strawberry", "corn", "pumpkin", "sunflower", "egg", "milk", "bacon", "flour", "juice", "jam", "cheese", "bread", "popcorn", "pie"]
+const ITEM_ORDER := ["wheat", "carrot", "strawberry", "corn", "pumpkin", "sunflower", "apple", "egg", "milk", "bacon", "flour", "juice", "jam", "cheese", "bread", "popcorn", "pie", "cider", "golden"]
 const CROP_ORDER := ["wheat", "carrot", "strawberry", "corn", "pumpkin", "sunflower"]
 const CROPS := {
 	"wheat": {"t": 8.0, "lvl": 1, "seed": 0},
@@ -30,7 +33,7 @@ const CROPS := {
 	"pumpkin": {"t": 35.0, "lvl": 6, "seed": 7},
 	"sunflower": {"t": 45.0, "lvl": 8, "seed": 12},
 }
-const STATION_ORDER := ["mill", "juicer", "dairy", "bakery", "popper", "oven", "jam"]
+const STATION_ORDER := ["mill", "juicer", "dairy", "bakery", "popper", "oven", "jam", "press"]
 const STATIONS := {
 	"mill": {"n": "Mill", "in": {"wheat": 2}, "out": "flour", "t": 6.0, "cost": 40, "lvl": 1, "c": Color(0.85, 0.75, 0.55)},
 	"juicer": {"n": "Juicer", "in": {"carrot": 2}, "out": "juice", "t": 8.0, "cost": 120, "lvl": 2, "c": Color(1.0, 0.65, 0.3)},
@@ -39,6 +42,7 @@ const STATIONS := {
 	"popper": {"n": "Popcorn Pot", "in": {"corn": 2}, "out": "popcorn", "t": 8.0, "cost": 380, "lvl": 5, "c": Color(1.0, 0.95, 0.5)},
 	"oven": {"n": "Pie Oven", "in": {"pumpkin": 1, "flour": 1, "egg": 1}, "out": "pie", "t": 16.0, "cost": 800, "lvl": 7, "c": Color(0.8, 0.45, 0.35)},
 	"jam": {"n": "Jam Pot", "in": {"strawberry": 3}, "out": "jam", "t": 12.0, "cost": 260, "lvl": 3, "c": Color(0.95, 0.5, 0.6)},
+	"press": {"n": "Cider Press", "in": {"apple": 3}, "out": "cider", "t": 14.0, "cost": 600, "lvl": 9, "c": Color(0.7, 0.5, 0.3)},
 }
 const ANIMAL_ORDER := ["chicken", "cow", "pig"]
 ## h = height the ready product floats at, spd = walk speed.
@@ -50,7 +54,7 @@ const ANIMALS := {
 const UPGRADE_ORDER := ["farmhand", "collector", "chef", "seller", "fert", "feed", "sign", "fame"]
 const UPGRADES := {
 	"farmhand": {"n": "Scarecrow Farmhand", "d": "Harvests ripe crops for you", "cost": 120, "max": 3},
-	"collector": {"n": "Barn Robot", "d": "Collects eggs and milk for you", "cost": 150, "max": 3},
+	"collector": {"n": "Barn Robot", "d": "Collects eggs, milk, bacon and apples", "cost": 150, "max": 3},
 	"chef": {"n": "Kitchen Helper", "d": "Runs your stations for you", "cost": 250, "max": 3},
 	"seller": {"n": "Stand Clerk", "d": "Sells to cars for you", "cost": 200, "max": 3},
 	"fert": {"n": "Fertilizer", "d": "Crops grow 15% faster", "cost": 60, "max": 5},
@@ -80,6 +84,32 @@ const DIRT := Color(0.45, 0.3, 0.18)
 const LOCKED_DIRT := Color(0.42, 0.5, 0.3)
 const WOOD := Color(0.6, 0.4, 0.22)
 const CAR_COLORS := [Color(0.9, 0.2, 0.2), Color(0.2, 0.5, 0.95), Color(1.0, 0.8, 0.1), Color(0.3, 0.8, 0.4), Color(0.7, 0.35, 0.9), Color(1.0, 0.55, 0.15), Color(0.95, 0.95, 0.95)]
+const ORCHARD_COST := 2000
+const ORCHARD_LVL := 9
+const APPLE_T := 30.0
+const TREE_SPOTS := [Vector3(13.5, 0, -8.2), Vector3(18.0, 0, -8.2), Vector3(13.5, 0, -4.6), Vector3(18.0, 0, -4.6)]
+## g = crop and apple growth multiplier.
+const WEATHER := {"sun": {"n": "Sunny", "g": 1.0}, "rain": {"n": "Rain: crops grow 50% faster", "g": 1.5}, "dry": {"n": "Dry spell: crops grow slower", "g": 0.7}}
+const HELPER_COLORS := {"farmhand": Color(0.75, 0.2, 0.2), "collector": Color(0.45, 0.65, 0.85), "chef": Color(0.92, 0.92, 0.95), "seller": Color(0.95, 0.75, 0.25)}
+## Index 0 = the helper's own colour from HELPER_COLORS.
+const SKIN_COLORS := [Color.WHITE, Color(0.85, 0.15, 0.15), Color(0.55, 0.3, 0.85), Color(1.0, 0.5, 0.75), Color(0.25, 0.7, 0.3), Color(0.15, 0.15, 0.18), Color(1.0, 0.8, 0.15)]
+const SKIN_NAMES := ["Classic", "Red", "Purple", "Pink", "Green", "Black", "Gold"]
+const SKIN_COST := 100
+## k = stat key (or "level"/"cows"), g = goal, r = coin reward.
+const QUESTS := [
+	{"n": "Harvest 50 crops", "k": "harvest", "g": 50, "r": 100},
+	{"n": "Sell to 25 cars", "k": "cars", "g": 25, "r": 150},
+	{"n": "Feed animals 20 times", "k": "fed", "g": 20, "r": 120},
+	{"n": "Deliver 5 orders", "k": "orders", "g": 5, "r": 250},
+	{"n": "Find 5 golden crops", "k": "golden", "g": 5, "r": 250},
+	{"n": "Serve the golden limo", "k": "limo", "g": 1, "r": 300},
+	{"n": "Own 4 cows", "k": "cows", "g": 4, "r": 400},
+	{"n": "Reach level 10", "k": "level", "g": 10, "r": 1000},
+	{"n": "Pick 100 apples", "k": "apples", "g": 100, "r": 600},
+	{"n": "Sell 50 pumpkin pies", "k": "sold_pie", "g": 50, "r": 2000},
+	{"n": "Harvest 500 crops", "k": "harvest", "g": 500, "r": 800},
+	{"n": "Sell to 200 cars", "k": "cars", "g": 200, "r": 1500},
+]
 
 # --- saved state ---
 var coins := 50
@@ -93,6 +123,22 @@ var upg := {"farmhand": 0, "collector": 0, "chef": 0, "seller": 0, "fert": 0, "f
 var muted := false
 var helper_timers := {}
 var collector_next := 0
+var stats := {}
+var claimed := []
+var skins := {}
+var orchard := false
+var trees := [0.0, 0.0, 0.0, 0.0]
+var tree_nodes := []
+var orchard_sign: Label3D
+var weather := "sun"
+var weather_t := 90.0
+var sun_light: DirectionalLight3D
+var rain: CPUParticles3D
+var ui_weather: Label
+var quests_btn: Button
+var quests_panel: PanelContainer
+var quests_box: VBoxContainer
+var assign_all_btn: Button
 var resetting := false
 var pause_panel: PanelContainer
 var help_title: Label
@@ -178,6 +224,7 @@ func _ready() -> void:
 		spawn_animal_node(i)
 	refresh_pen_signs()
 	refresh_helpers()
+	refresh_orchard()
 	refresh_ui()
 	if not seen_help:
 		show_help(0)
@@ -191,6 +238,11 @@ func new_game_state() -> void:
 		stations[id] = {"own": false, "busy": false, "t": 0.0, "ready": 0}
 	animals = [{"type": "chicken", "t": 0.0}]
 	inv = {}
+	stats = {}
+	claimed = []
+	skins = {}
+	orchard = false
+	trees = [0.0, 0.0, 0.0, 0.0]
 
 
 # ================= helpers =================
@@ -455,6 +507,7 @@ func build_world() -> void:
 	sun.shadow_enabled = true
 	sun.directional_shadow_max_distance = 60.0
 	add_child(sun)
+	sun_light = sun
 
 	cam = Camera3D.new()
 	cam.fov = 45.0
@@ -472,6 +525,8 @@ func build_world() -> void:
 	build_stand()
 	build_pen()
 	build_decor()
+	build_orchard()
+	build_rain()
 
 	# one tap target covers the biggest farm; plots and build ghosts sit on top of it
 	field_root = node_at(self, Vector3.ZERO)
@@ -661,6 +716,8 @@ func build_station_model(id: String, b: Node3D) -> void:
 			cyl(spin, 0.3, 0.3, 0.1, Vector3.ZERO, Color(0.95, 0.55, 0.2), 10).rotation_degrees.x = 90
 		"jam":
 			cyl(spin, 0.26, 0.22, 0.36, Vector3.ZERO, Color(0.85, 0.15, 0.3), 12)
+		"press":
+			cyl(spin, 0.32, 0.32, 0.5, Vector3.ZERO, Color(0.55, 0.35, 0.2), 12).rotation_degrees.x = 90
 
 
 # ================= field & plots =================
@@ -699,7 +756,7 @@ func plot_cost() -> int:
 
 
 func grow_mult() -> float:
-	return 1.0 + 0.15 * upg["fert"]
+	return (1.0 + 0.15 * upg["fert"]) * float(WEATHER[weather]["g"])
 
 
 func ripe(p: Dictionary) -> bool:
@@ -951,7 +1008,10 @@ func harvest_plot(i: int, replant := "") -> void:
 	add_item(crop, 4 if gold else 2)
 	gain_xp(3 if gold else 1)
 	play("pop")
+	stat("harvest")
 	if gold:
+		add_item("golden", 1)
+		stat("golden")
 		var bonus: int = ITEMS[crop]["p"] * 3
 		coins += bonus
 		play("coin")
@@ -1045,6 +1105,7 @@ func toggle_assign() -> void:
 	if assign_mode and build_mode:
 		toggle_build()
 	assign_btn.modulate = Color(0.6, 1, 0.7) if assign_mode else Color.WHITE
+	assign_all_btn.visible = assign_mode
 	if assign_mode:
 		toast("Pick a seed, then tap plots to assign it to the farmhand\nTap again to clear", 4.0)
 	play("pop")
@@ -1379,8 +1440,16 @@ func tap_animal(i: int) -> void:
 		float_text(n.position, "+1 " + item_name(ad["out"]), Color(1, 1, 0.9))
 		animal_nodes[i]["prod"].visible = false
 		bounce(animal_nodes[i]["body"])
+	elif have("wheat") > 0:
+		inv["wheat"] = have("wheat") - 1
+		a["t"] = minf(a["t"] + ad["t"] * 0.3, ad["t"])
+		stat("fed")
+		play("pop")
+		float_text(n.position, "Fed! -1 Wheat", Color(0.95, 0.8, 0.3))
+		bounce(animal_nodes[i]["body"])
+		refresh_ui()
 	else:
-		toast("%s ready in %ds" % [item_name(ad["out"]), ceili((ad["t"] - a["t"]) / feed_mult())])
+		toast("%s ready in %ds\nHave wheat? Tap to feed it and speed it up" % [item_name(ad["out"]), ceili((ad["t"] - a["t"]) / feed_mult())])
 		bounce(animal_nodes[i]["body"])
 
 
@@ -1464,10 +1533,16 @@ func available_goods() -> Array:
 	for s in STATION_ORDER:
 		if stations[s]["own"]:
 			out.append(STATIONS[s]["out"])
+	if orchard:
+		out.append("apple")
 	return out
 
 
 func spawn_car() -> void:
+	if have("golden") > 0 and randf() < 0.35 and not limo_present():
+		spawn_limo()
+		return
+	var hot := hot_crop()
 	var goods := available_goods()
 	var weights := []
 	var total := 0.0
@@ -1475,6 +1550,8 @@ func spawn_car() -> void:
 		var w: float = 1.0 + ITEMS[g]["p"] / 10.0
 		if have(g) > 0:
 			w *= 6.0
+		if g == hot:
+			w *= 3.0
 		weights.append(w)
 		total += w
 	var r := randf() * total
@@ -1486,6 +1563,8 @@ func spawn_car() -> void:
 			break
 	var qty := 1 + randi() % mini(4, 1 + int(level / 2.0))
 	var pay := int(ceil(ITEMS[want]["p"] * qty * 1.6 * (1.0 + 0.1 * upg["fame"])))
+	if want == hot:
+		pay *= 2
 	var n := build_car(CAR_COLORS[randi() % CAR_COLORS.size()])
 	n.position = Vector3(-48, 0, LANE_Z)
 	var lbl := label3d(n, "", Vector3(0, 2.7, 0), 40)
@@ -1538,6 +1617,10 @@ func tap_car(iid: int) -> void:
 		bounce(n.get_node("Body"))
 		return
 	inv[want] = have(want) - c["qty"]
+	stat("cars")
+	stat("sold_" + want, c["qty"])
+	if c.get("limo", false):
+		stat("limo")
 	var bonus := int(c["pay"] * 0.05 * mini(streak, 10))
 	var total: int = c["pay"] + bonus
 	streak += 1
@@ -1641,6 +1724,8 @@ func gain_xp(n: int) -> void:
 		for k in range(1, LAND_LVL.size()):
 			if LAND_LVL[k] == level:
 				unlocks.append("Farm expansion")
+		if level == ORCHARD_LVL:
+			unlocks.append("Orchard")
 		var msg := "LEVEL %d!" % level
 		if unlocks.size() > 0:
 			msg += "  Unlocked: " + ", ".join(unlocks)
@@ -1709,6 +1794,7 @@ func deliver_order(i: int) -> void:
 	for k in o["items"]:
 		inv[k] = have(k) - o["items"][k]
 	coins += o["pay"]
+	stat("orders")
 	play("coin")
 	toast("Order delivered! +$%d" % o["pay"])
 	orders.remove_at(i)
@@ -1801,6 +1887,8 @@ func _process(delta: float) -> void:
 	update_cars(delta)
 	update_helpers(delta)
 	update_helper_bodies(delta)
+	update_trees(delta)
+	update_weather(delta)
 	ui_timer -= delta
 	if ui_timer <= 0:
 		ui_timer = 0.25
@@ -1906,6 +1994,10 @@ func tap(pos: Vector2) -> void:
 			tap_field(hit["position"])
 		"expand":
 			buy_land()
+		"tree":
+			tap_tree(id)
+		"orchard":
+			buy_orchard()
 
 
 # ================= UI =================
@@ -1960,6 +2052,10 @@ func build_ui() -> void:
 	ui_streak.add_theme_color_override("font_color", Color(1, 0.6, 0.3))
 	ui_streak.visible = false
 	v.add_child(ui_streak)
+	ui_weather = Label.new()
+	ui_weather.add_theme_font_size_override("font_size", 20)
+	ui_weather.add_theme_color_override("font_color", Color(0.75, 0.9, 1.0))
+	v.add_child(ui_weather)
 	ui_inv = Label.new()
 	ui_inv.add_theme_font_size_override("font_size", 21)
 	v.add_child(ui_inv)
@@ -2001,6 +2097,14 @@ func build_ui() -> void:
 	assign_btn.pressed.connect(toggle_assign)
 	tr.add_child(assign_btn)
 	tr.move_child(assign_btn, 3)
+	assign_all_btn = big_button("All")
+	assign_all_btn.pressed.connect(assign_all)
+	assign_all_btn.visible = false
+	tr.add_child(assign_all_btn)
+	tr.move_child(assign_all_btn, 4)
+	quests_btn = big_button("Quests")
+	quests_btn.pressed.connect(func(): build_quests_panel(); quests_panel.visible = not quests_panel.visible; upg_panel.visible = false; orders_panel.visible = false)
+	tr.add_child(quests_btn)
 	var harvest_btn := big_button("Harvest All")
 	harvest_btn.pressed.connect(harvest_all)
 	tr.add_child(harvest_btn)
@@ -2051,6 +2155,12 @@ func build_ui() -> void:
 	orders_box.add_theme_constant_override("separation", 10)
 	orders_panel.add_child(orders_box)
 	orders_panel.visible = false
+
+	quests_panel = center_panel(root)
+	quests_box = VBoxContainer.new()
+	quests_box.add_theme_constant_override("separation", 8)
+	quests_panel.add_child(quests_box)
+	quests_panel.visible = false
 
 	help_panel = center_panel(root)
 	var hv := VBoxContainer.new()
@@ -2124,7 +2234,8 @@ func help_pages() -> Array:
 		["Kitchen Stations", "Stations turn raw items into goods that sell for much more. Tap an empty pad to build one, then tap it to start cooking. It keeps cooking by itself while you have ingredients. Tap it when it says READY to collect.\n\n" + "\n".join(recipes)],
 		["Selling", "Cars line up at the farm stand. Each shows what it wants, the price, and how long it will wait.\n\nTap a car to sell. If you don't have what it wants, keep farming: it will wait a while, and new cars ask for things you already have more often."],
 		["Orders & Streaks", "The Orders board has big deliveries that pay much more than cars. Deliver one and a new order arrives. Don't like one? Skip it.\n\nSell to cars back to back to build a sale streak: each car in a row pays 5% more, up to +50%. Let a car leave unhappy and the streak resets!"],
-		["Helpers (automation)", "Tired of tapping? Hire helpers in the Upgrades menu. They show up on the farm and keep working while you play:\n\n- Scarecrow Farmhand: harvests ripe crops\n- Barn Robot: collects eggs, milk and bacon\n- Kitchen Helper: collects and restarts stations\n- Stand Clerk: sells to cars when you have their order\n\nEach helper can be upgraded twice to work faster. With all four, your farm runs itself."],
+		["Helpers (automation)", "Tired of tapping? Hire helpers in the Upgrades menu. They show up on the farm and keep working while you play:\n\n- Scarecrow Farmhand: harvests ripe crops (tap Robot to choose what it plants on each plot)\n- Barn Robot: collects eggs, milk, bacon and apples\n- Kitchen Helper: collects and restarts stations\n- Stand Clerk: sells to cars when you have their order\n\nEach helper can be upgraded twice to work faster. Change their colours with Helper Skins in Upgrades."],
+		["Extras", "- Weather: rain makes crops and apples grow 50% faster, a dry spell slows them down.\n- Hot crop: one crop sells for double each day (shown top left).\n- Feeding: tap a waiting animal to feed it 1 wheat and speed it up.\n- Golden crops also give a Golden Crop item. A golden limo comes by to buy them for 5x.\n- Quests: finish goals for coin rewards.\n- Orchard (level 9): apple trees, plus a Cider Press station."],
 		["Controls & Tips", "- Tap: plant, harvest, collect, build, sell\n- Drag: move the camera\n- + / - buttons (or mouse wheel / pinch): zoom\n- Pause button (or Esc key): pause, sound, restart\n\nTips: build the Mill early, since flour sells for nearly 4x wheat. Hire the Stand Clerk first so cars never leave unhappy. The game saves by itself."],
 	]
 
@@ -2198,13 +2309,20 @@ func update_helpers(delta: float) -> void:
 						send_helper(h, plot_pos(i) + Vector3(0, 0, 1.3))
 						break
 			"collector":
-				# take turns round the pen so fast chickens can't starve the cows and pigs
-				for k in animals.size():
-					var i := (collector_next + k) % animals.size()
-					if animals[i]["t"] >= ANIMALS[animals[i]["type"]]["t"]:
+				# take turns round the pen and orchard so fast chickens can't starve anything else
+				var total := animals.size() + (trees.size() if orchard else 0)
+				for k in total:
+					var i := (collector_next + k) % total
+					if i < animals.size():
+						if animals[i]["t"] >= ANIMALS[animals[i]["type"]]["t"]:
+							collector_next = i + 1
+							tap_animal(i)
+							send_helper(h, animal_nodes[i]["node"].position + Vector3(0, 0, 0.9))
+							break
+					elif trees[i - animals.size()] >= APPLE_T:
 						collector_next = i + 1
-						tap_animal(i)
-						send_helper(h, animal_nodes[i]["node"].position + Vector3(0, 0, 0.9))
+						tap_tree(i - animals.size())
+						send_helper(h, TREE_SPOTS[i - animals.size()] + Vector3(0, 0, 1.6))
 						break
 			"chef":
 				for id in STATION_ORDER:
@@ -2244,27 +2362,27 @@ func refresh_helpers() -> void:
 		var body := node_at(n, Vector3.ZERO)
 		match h:
 			"farmhand":
-				build_scarecrow(body)
+				build_scarecrow(body, helper_color(h))
 			"collector":
-				build_robot(body, Color(0.45, 0.65, 0.85), Color(0.3, 1.0, 0.6), "basket")
+				build_robot(body, helper_color(h), Color(0.3, 1.0, 0.6), "basket")
 			"chef":
-				build_robot(body, Color(0.92, 0.92, 0.95), Color(1.0, 0.7, 0.2), "chef")
+				build_robot(body, helper_color(h), Color(1.0, 0.7, 0.2), "chef")
 			"seller":
-				build_robot(body, Color(0.95, 0.75, 0.25), Color(0.3, 0.8, 1.0), "cap")
+				build_robot(body, helper_color(h), Color(0.3, 0.8, 1.0), "cap")
 		n.rotation.y = PI if h == "collector" else 0.0
 		helper_nodes[h] = {"node": n, "body": body, "target": n.position}
 
 
-func build_scarecrow(b: Node3D) -> void:
+func build_scarecrow(b: Node3D, shirt: Color) -> void:
 	var straw := Color(0.95, 0.82, 0.4)
 	cyl(b, 0.06, 0.07, 1.6, Vector3(0, 0.8, 0), WOOD, 8)
 	box(b, Vector3(1.6, 0.08, 0.08), Vector3(0, 1.45, 0), WOOD)
-	box(b, Vector3(0.6, 0.65, 0.34), Vector3(0, 1.35, 0), Color(0.75, 0.2, 0.2))
+	box(b, Vector3(0.6, 0.65, 0.34), Vector3(0, 1.35, 0), shirt)
 	for k in 3:
-		box(b, Vector3(0.62, 0.04, 0.36), Vector3(0, 1.15 + k * 0.2, 0), Color(0.45, 0.1, 0.1))
+		box(b, Vector3(0.62, 0.04, 0.36), Vector3(0, 1.15 + k * 0.2, 0), shirt.darkened(0.4))
 	box(b, Vector3(0.62, 0.3, 0.36), Vector3(0, 0.95, 0), Color(0.3, 0.4, 0.7))
 	for x in [-0.6, 0.6]:
-		box(b, Vector3(0.45, 0.2, 0.22), Vector3(x, 1.45, 0), Color(0.75, 0.2, 0.2))
+		box(b, Vector3(0.45, 0.2, 0.22), Vector3(x, 1.45, 0), shirt)
 		cyl(b, 0.0, 0.08, 0.22, Vector3(x * 1.42, 1.45, 0), straw, 6).rotation_degrees.z = 90.0 * signf(x)
 	sph(b, 0.26, Vector3(0, 1.92, 0), Color(0.85, 0.72, 0.5))
 	for x in [-0.09, 0.09]:
@@ -2416,6 +2534,9 @@ func build_upgrade_panel() -> void:
 			b.text = "%s  Lv %d  -  $%d\n%s" % [u["n"], upg[id] + 1, upgrade_cost(id), u["d"]]
 			b.pressed.connect(func(): buy_upgrade(id))
 		grid.add_child(b)
+	var sk := big_button("Helper Skins")
+	sk.pressed.connect(build_skins_panel)
+	upg_box.add_child(sk)
 	var close := big_button("Close")
 	close.pressed.connect(func(): upg_panel.visible = false)
 	upg_box.add_child(close)
@@ -2448,6 +2569,11 @@ func refresh_ui() -> void:
 		orders_btn.text = "Orders!" if ready else "Orders"
 	if ui_hint:
 		ui_hint.text = hint_text()
+	if ui_weather:
+		ui_weather.text = "%s\nHot today: %s (x2 price)" % [WEATHER[weather]["n"], item_name(hot_crop())]
+	if quests_btn:
+		quests_btn.text = "Quests!" if quests_ready() > 0 else "Quests"
+	refresh_orchard()
 
 
 func toast(msg: String, dur := 2.0) -> void:
@@ -2460,6 +2586,302 @@ func toast(msg: String, dur := 2.0) -> void:
 	toast_tween.tween_property(ui_toast, "modulate:a", 0.0, 0.5)
 
 
+# ================= extras: weather, market, orchard, quests, skins =================
+
+func stat(k: String, n := 1) -> void:
+	stats[k] = int(stats.get(k, 0)) + n
+
+
+## The crop that sells for double today: picked from unlocked crops by the real date.
+func hot_crop() -> String:
+	var open := []
+	for c in CROP_ORDER:
+		if level >= CROPS[c]["lvl"]:
+			open.append(c)
+	return open[absi(hash(Time.get_date_string_from_system())) % open.size()]
+
+
+func update_weather(delta: float) -> void:
+	rain.position = cam_target + Vector3(0, 14, 0)
+	weather_t -= delta
+	if weather_t > 0:
+		return
+	weather_t = randf_range(60.0, 120.0)
+	var r := randf()
+	set_weather("rain" if r < 0.25 else ("dry" if r < 0.45 else "sun"))
+
+
+func set_weather(w: String) -> void:
+	if w == weather:
+		return
+	weather = w
+	rain.emitting = w == "rain"
+	sun_light.light_energy = {"sun": 1.15, "rain": 0.55, "dry": 1.45}[w]
+	sun_light.light_color = {"sun": Color(1.0, 0.96, 0.88), "rain": Color(0.75, 0.8, 0.9), "dry": Color(1.0, 0.82, 0.6)}[w]
+	toast(WEATHER[w]["n"] + "!", 3.0)
+	refresh_ui()
+
+
+func build_rain() -> void:
+	rain = CPUParticles3D.new()
+	rain.amount = 600
+	rain.lifetime = 1.2
+	rain.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+	rain.emission_box_extents = Vector3(30, 0.5, 22)
+	rain.direction = Vector3.DOWN
+	rain.spread = 3.0
+	rain.initial_velocity_min = 14.0
+	rain.initial_velocity_max = 16.0
+	var m := BoxMesh.new()
+	m.size = Vector3(0.03, 0.5, 0.03)
+	var rm := StandardMaterial3D.new()
+	rm.albedo_color = Color(0.75, 0.85, 1.0, 0.6)
+	rm.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	rm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.material = rm
+	rain.mesh = m
+	rain.emitting = false
+	add_child(rain)
+
+
+func limo_present() -> bool:
+	for c in cars:
+		if c.get("limo", false) and not c["leaving"]:
+			return true
+	return false
+
+
+## A long golden car that only buys Golden Crops, at 5x their price.
+func spawn_limo() -> void:
+	var qty := mini(have("golden"), 1 + randi() % 2)
+	var pay := int(ITEMS["golden"]["p"] * qty * 5 * (1.0 + 0.1 * upg["fame"]))
+	var n := build_car(GOLD)
+	(n.get_node("Body") as Node3D).scale = Vector3(1.5, 1.0, 1.0)
+	n.position = Vector3(-48, 0, LANE_Z)
+	var lbl := label3d(n, "", Vector3(0, 2.7, 0), 40)
+	add_hit(n, Vector3(4.4, 2.2, 1.8), Vector3(0, 1.0, 0), "car", n.get_instance_id())
+	cars.append({"node": n, "want": "golden", "qty": qty, "pay": pay, "patience": 60.0, "max": 60.0, "label": lbl, "leaving": false, "limo": true})
+	toast("A golden limo is coming for your Golden Crops!", 3.0)
+
+
+func build_orchard() -> void:
+	box(self, Vector3(9.0, 0.04, 7.6), Vector3(15.75, 0.02, -6.4), Color(0.4, 0.56, 0.25))
+	for i in TREE_SPOTS.size():
+		var t := node_at(self, TREE_SPOTS[i])
+		var body := node_at(t, Vector3.ZERO)
+		cyl(body, 0.2, 0.3, 1.6, Vector3(0, 0.8, 0), Color(0.45, 0.3, 0.18), 8)
+		sph(body, 1.3, Vector3(0, 2.4, 0), Color(0.25, 0.58, 0.22))
+		sph(body, 0.9, Vector3(0.7, 2.8, 0.3), Color(0.3, 0.64, 0.25))
+		sph(body, 0.85, Vector3(-0.7, 2.7, -0.3), Color(0.22, 0.52, 0.2))
+		bake(body)
+		var apples := node_at(t, Vector3.ZERO)
+		for k in 8:
+			var ang := k * TAU / 8.0
+			sph(apples, 0.17, Vector3(cos(ang) * 1.25, 2.1 + (k % 3) * 0.35, sin(ang) * 1.25), Color(0.9, 0.12, 0.12), Vector3.ONE, 10)
+		add_hit(t, Vector3(2.6, 3.6, 2.6), Vector3(0, 1.8, 0), "tree", i)
+		tree_nodes.append({"node": t, "body": body, "apples": apples})
+	var sn := node_at(self, Vector3(15.75, 0, -1.6))
+	box(sn, Vector3(0.12, 1.2, 0.12), Vector3(0, 0.6, 0), WOOD)
+	box(sn, Vector3(2.6, 1.05, 0.08), Vector3(0, 1.4, -0.02), WOOD)
+	box(sn, Vector3(2.5, 0.95, 0.1), Vector3(0, 1.4, 0), Color(0.95, 0.9, 0.75))
+	orchard_sign = label3d(sn, "", Vector3(0, 1.4, 0.08), 30, false)
+	orchard_sign.modulate = Color(0.2, 0.12, 0.05)
+	orchard_sign.outline_size = 0
+	add_hit(sn, Vector3(2.2, 1.8, 0.8), Vector3(0, 1.0, 0), "orchard", 0)
+
+
+func refresh_orchard() -> void:
+	if orchard_sign == null:
+		return
+	for i in tree_nodes.size():
+		(tree_nodes[i]["node"] as Node3D).visible = orchard
+		(tree_nodes[i]["apples"] as Node3D).visible = orchard and trees[i] >= APPLE_T
+	if orchard:
+		orchard_sign.text = "Barry's Orchard\nTap trees for apples"
+	elif level < ORCHARD_LVL:
+		orchard_sign.text = "Orchard\nLevel %d" % ORCHARD_LVL
+	else:
+		orchard_sign.text = "Buy Orchard\n$%d" % ORCHARD_COST
+
+
+func buy_orchard() -> void:
+	if orchard:
+		toast("Tap a tree with red apples to pick them")
+		return
+	if level < ORCHARD_LVL:
+		toast("The orchard unlocks at level %d" % ORCHARD_LVL)
+		play("nope")
+		return
+	if coins < ORCHARD_COST:
+		toast("Need $%d for the orchard" % ORCHARD_COST)
+		play("nope")
+		return
+	coins -= ORCHARD_COST
+	orchard = true
+	play("build")
+	float_text(Vector3(15.75, 1, -6.4), "Orchard planted!", Color(0.6, 1, 0.6))
+	refresh_orchard()
+	refresh_ui()
+
+
+func update_trees(delta: float) -> void:
+	if not orchard:
+		return
+	for i in trees.size():
+		if trees[i] < APPLE_T:
+			trees[i] = minf(trees[i] + delta * grow_mult(), APPLE_T)
+			if trees[i] >= APPLE_T:
+				(tree_nodes[i]["apples"] as Node3D).visible = true
+
+
+func tap_tree(i: int) -> void:
+	if not orchard:
+		buy_orchard()
+		return
+	if trees[i] < APPLE_T:
+		toast("Apples ready in %ds" % ceili((APPLE_T - trees[i]) / grow_mult()))
+		return
+	trees[i] = 0.0
+	add_item("apple", 3)
+	stat("apples", 3)
+	gain_xp(2)
+	play("pop")
+	float_text(TREE_SPOTS[i] + Vector3(0, 2, 0), "+3 Apple", ITEMS["apple"]["c"])
+	bounce(tree_nodes[i]["body"])
+	refresh_orchard()
+
+
+## Farmhand assign mode: give every plot the selected seed, or clear them all if they already have it.
+func assign_all() -> void:
+	var all_set := true
+	for p in plots:
+		all_set = all_set and p.get("assign", "") == sel_crop
+	for i in plots.size():
+		plots[i]["assign"] = "" if all_set else sel_crop
+		refresh_plot(i)
+	toast("All plots unassigned" if all_set else "Farmhand will plant %s everywhere" % item_name(sel_crop))
+	play("pop")
+
+
+func quest_progress(q: Dictionary) -> int:
+	match q["k"]:
+		"level":
+			return level
+		"cows":
+			return animal_count("cow")
+	return int(stats.get(q["k"], 0))
+
+
+func quests_ready() -> int:
+	var n := 0
+	for i in QUESTS.size():
+		if not claimed.has(i) and quest_progress(QUESTS[i]) >= QUESTS[i]["g"]:
+			n += 1
+	return n
+
+
+func build_quests_panel() -> void:
+	for c in quests_box.get_children():
+		c.queue_free()
+	var t := Label.new()
+	t.text = "Quests"
+	t.add_theme_font_size_override("font_size", 34)
+	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	quests_box.add_child(t)
+	var sc := ScrollContainer.new()
+	sc.custom_minimum_size = Vector2(600, 440)
+	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	quests_box.add_child(sc)
+	var list := VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_theme_constant_override("separation", 8)
+	sc.add_child(list)
+	for i in QUESTS.size():
+		var q: Dictionary = QUESTS[i]
+		var row := HBoxContainer.new()
+		list.add_child(row)
+		var l := Label.new()
+		l.add_theme_font_size_override("font_size", 20)
+		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var prog := mini(quest_progress(q), q["g"])
+		l.text = "%s\n%d / %d   Reward $%d" % [q["n"], prog, q["g"], q["r"]]
+		row.add_child(l)
+		var b := big_button("")
+		b.custom_minimum_size = Vector2(120, 56)
+		if claimed.has(i):
+			b.text = "Done"
+			b.disabled = true
+		elif prog >= q["g"]:
+			b.text = "Claim"
+			b.pressed.connect(claim_quest.bind(i))
+		else:
+			b.text = "%d%%" % int(100.0 * prog / q["g"])
+			b.disabled = true
+		row.add_child(b)
+	var close := big_button("Close")
+	close.pressed.connect(func(): quests_panel.visible = false)
+	quests_box.add_child(close)
+
+
+func claim_quest(i: int) -> void:
+	if claimed.has(i) or quest_progress(QUESTS[i]) < QUESTS[i]["g"]:
+		return
+	claimed.append(i)
+	coins += QUESTS[i]["r"]
+	play("coin")
+	toast("Quest done: %s! +$%d" % [QUESTS[i]["n"], QUESTS[i]["r"]], 3.0)
+	build_quests_panel()
+	refresh_ui()
+
+
+func helper_color(h: String) -> Color:
+	var idx := int(skins.get(h, 0))
+	return HELPER_COLORS[h] if idx == 0 else SKIN_COLORS[idx]
+
+
+func build_skins_panel() -> void:
+	for c in upg_box.get_children():
+		c.queue_free()
+	var t := Label.new()
+	t.text = "Helper Skins"
+	t.add_theme_font_size_override("font_size", 34)
+	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	upg_box.add_child(t)
+	var any := false
+	for h in HELPERS:
+		if upg[h] == 0:
+			continue
+		any = true
+		var b := big_button("%s: %s\nTap for the next look ($%d)" % [UPGRADES[h]["n"], SKIN_NAMES[int(skins.get(h, 0))], SKIN_COST])
+		b.custom_minimum_size = Vector2(440, 76)
+		b.add_theme_font_size_override("font_size", 20)
+		b.pressed.connect(cycle_skin.bind(h))
+		upg_box.add_child(b)
+	if not any:
+		var l := Label.new()
+		l.text = "Hire a helper first!"
+		upg_box.add_child(l)
+	var back := big_button("Back")
+	back.pressed.connect(build_upgrade_panel)
+	upg_box.add_child(back)
+
+
+func cycle_skin(h: String) -> void:
+	if coins < SKIN_COST:
+		toast("Need $%d for a new look" % SKIN_COST)
+		play("nope")
+		return
+	coins -= SKIN_COST
+	skins[h] = (int(skins.get(h, 0)) + 1) % SKIN_COLORS.size()
+	if helper_nodes.has(h):
+		(helper_nodes[h]["node"] as Node3D).queue_free()
+		helper_nodes.erase(h)
+	refresh_helpers()
+	play("build")
+	build_skins_panel()
+	refresh_ui()
+
+
 # ================= save / load =================
 
 func save_game() -> void:
@@ -2467,7 +2889,8 @@ func save_game() -> void:
 		return
 	var d := {"coins": coins, "xp": xp, "level": level, "inv": inv, "plots": plots, "stations": stations,
 		"animals": animals, "upg": upg, "sel": sel_crop, "help": seen_help, "muted": muted,
-		"land": land, "orders": orders, "streak": streak}
+		"land": land, "orders": orders, "streak": streak, "stats": stats, "claimed": claimed,
+		"skins": skins, "orchard": orchard, "trees": trees}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
 		f.store_string(JSON.stringify(d))
@@ -2533,6 +2956,19 @@ func load_game() -> void:
 	for k in u:
 		if upg.has(k):
 			upg[k] = int(u[k])
+	var st: Dictionary = d.get("stats", {})
+	for k in st:
+		stats[k] = int(st[k])
+	for q in d.get("claimed", []):
+		claimed.append(int(q))
+	var sk: Dictionary = d.get("skins", {})
+	for k in sk:
+		if HELPER_COLORS.has(k):
+			skins[k] = clampi(int(sk[k]), 0, SKIN_COLORS.size() - 1)
+	orchard = bool(d.get("orchard", false))
+	var tr: Array = d.get("trees", [])
+	for k in mini(tr.size(), trees.size()):
+		trees[k] = float(tr[k])
 
 
 func _notification(what: int) -> void:
