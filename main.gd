@@ -2381,6 +2381,8 @@ func refresh_ui() -> void:
 			if k < order_btns.size() and is_instance_valid(order_btns[k]):
 				(order_btns[k] as Button).disabled = not ok
 		orders_btn.text = "Orders!" if ready else "Orders"
+	if ui_hint:
+		ui_hint.text = hint_text()
 
 
 func toast(msg: String, dur := 2.0) -> void:
