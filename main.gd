@@ -38,14 +38,20 @@ const ANIMALS := {
 	"chicken": {"n": "Chicken", "out": "egg", "t": 12.0, "cost": 40, "lvl": 1, "max": 6},
 	"cow": {"n": "Cow", "out": "milk", "t": 20.0, "cost": 150, "lvl": 3, "max": 4},
 }
-const UPGRADE_ORDER := ["fert", "feed", "sign", "fame"]
+const UPGRADE_ORDER := ["farmhand", "collector", "chef", "seller", "fert", "feed", "sign", "fame"]
 const UPGRADES := {
-	"fert": {"n": "Fertilizer", "d": "Crops grow 15% faster", "cost": 80},
-	"feed": {"n": "Tasty Feed", "d": "Animals produce 15% faster", "cost": 120},
-	"sign": {"n": "Big Billboard", "d": "Customers arrive sooner", "cost": 100},
-	"fame": {"n": "Good Reviews", "d": "Customers pay 10% more", "cost": 150},
+	"farmhand": {"n": "Scarecrow Farmhand", "d": "Harvests ripe crops for you", "cost": 120, "max": 3},
+	"collector": {"n": "Barn Robot", "d": "Collects eggs and milk for you", "cost": 150, "max": 3},
+	"chef": {"n": "Kitchen Helper", "d": "Runs your stations for you", "cost": 250, "max": 3},
+	"seller": {"n": "Stand Clerk", "d": "Sells to cars for you", "cost": 200, "max": 3},
+	"fert": {"n": "Fertilizer", "d": "Crops grow 15% faster", "cost": 60, "max": 5},
+	"feed": {"n": "Tasty Feed", "d": "Animals produce 15% faster", "cost": 90, "max": 5},
+	"sign": {"n": "Big Billboard", "d": "Customers arrive sooner", "cost": 80, "max": 5},
+	"fame": {"n": "Good Reviews", "d": "Customers pay 10% more", "cost": 120, "max": 5},
 }
-const UPGRADE_MAX := 5
+const HELPERS := ["farmhand", "collector", "chef", "seller"]
+## Seconds between helper actions for upgrade levels 0..3 (0 = not hired).
+const HELPER_INTERVAL := [0.0, 5.0, 2.5, 1.0]
 const SAVE_PATH := "user://barrys_barn.json"
 const PLOT_COUNT := 16
 const STAND_X := 6.0
@@ -58,14 +64,26 @@ const WOOD := Color(0.6, 0.4, 0.22)
 const CAR_COLORS := [Color(0.9, 0.2, 0.2), Color(0.2, 0.5, 0.95), Color(1.0, 0.8, 0.1), Color(0.3, 0.8, 0.4), Color(0.7, 0.35, 0.9), Color(1.0, 0.55, 0.15), Color(0.95, 0.95, 0.95)]
 
 # --- saved state ---
-var coins := 20
+var coins := 50
 var xp := 0
 var level := 1
 var inv := {}
 var plots := []
 var stations := {}
 var animals := []
-var upg := {"fert": 0, "feed": 0, "sign": 0, "fame": 0}
+var upg := {"farmhand": 0, "collector": 0, "chef": 0, "seller": 0, "fert": 0, "feed": 0, "sign": 0, "fame": 0}
+var muted := false
+var helper_timers := {}
+var resetting := false
+var pause_panel: PanelContainer
+var help_title: Label
+var help_body: Label
+var help_page_lbl: Label
+var help_prev: Button
+var help_next: Button
+var help_page := 0
+var reset_btn: Button
+var mute_btn: Button
 var sel_crop := "wheat"
 var seen_help := false
 
@@ -116,7 +134,8 @@ func _ready() -> void:
 		spawn_animal_node(i)
 	refresh_pen_signs()
 	refresh_ui()
-	help_panel.visible = not seen_help
+	if not seen_help:
+		show_help(0)
 
 
 func new_game_state() -> void:
@@ -864,7 +883,7 @@ func spawn_car() -> void:
 	for g in goods:
 		var w: float = 1.0 + ITEMS[g]["p"] / 10.0
 		if have(g) > 0:
-			w *= 3.0
+			w *= 6.0
 		weights.append(w)
 		total += w
 	var r := randf() * total
@@ -875,12 +894,12 @@ func spawn_car() -> void:
 			want = goods[k]
 			break
 	var qty := 1 + randi() % mini(4, 1 + int(level / 2.0))
-	var pay := int(ceil(ITEMS[want]["p"] * qty * 1.3 * (1.0 + 0.1 * upg["fame"])))
+	var pay := int(ceil(ITEMS[want]["p"] * qty * 1.6 * (1.0 + 0.1 * upg["fame"])))
 	var n := build_car(CAR_COLORS[randi() % CAR_COLORS.size()])
 	n.position = Vector3(-48, 0, LANE_Z)
 	var lbl := label3d(n, "", Vector3(0, 2.7, 0), 40)
 	add_hit(n, Vector3(3.0, 2.2, 1.8), Vector3(0, 1.0, 0), "car", n.get_instance_id())
-	var patience := 30.0 + level * 2.0
+	var patience := 45.0 + level * 3.0
 	cars.append({"node": n, "want": want, "qty": qty, "pay": pay, "patience": patience, "max": patience, "label": lbl, "leaving": false})
 
 
@@ -990,7 +1009,7 @@ func update_cars(delta: float) -> void:
 # ================= progression =================
 
 func xp_needed() -> int:
-	return int(40.0 * pow(level, 1.6))
+	return int(30.0 * pow(level, 1.45))
 
 
 func gain_xp(n: int) -> void:
@@ -1026,7 +1045,7 @@ func upgrade_cost(id: String) -> int:
 
 
 func buy_upgrade(id: String) -> void:
-	if upg[id] >= UPGRADE_MAX:
+	if upg[id] >= UPGRADES[id]["max"]:
 		return
 	var cost := upgrade_cost(id)
 	if coins < cost:
@@ -1073,6 +1092,7 @@ func _process(delta: float) -> void:
 					station_start(id)
 	update_animals(delta)
 	update_cars(delta)
+	update_helpers(delta)
 	ui_timer -= delta
 	if ui_timer <= 0:
 		ui_timer = 0.25
@@ -1152,6 +1172,7 @@ func tap(pos: Vector2) -> void:
 
 func build_ui() -> void:
 	var cl := CanvasLayer.new()
+	cl.process_mode = Node.PROCESS_MODE_ALWAYS
 	add_child(cl)
 	var root := Control.new()
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -1209,8 +1230,11 @@ func build_ui() -> void:
 	ub.pressed.connect(func(): build_upgrade_panel(); upg_panel.visible = not upg_panel.visible; help_panel.visible = false)
 	tr.add_child(ub)
 	var hb := big_button(" ? ")
-	hb.pressed.connect(func(): help_panel.visible = not help_panel.visible; upg_panel.visible = false)
+	hb.pressed.connect(func(): show_help(0))
 	tr.add_child(hb)
+	var pb := big_button(" II ")
+	pb.pressed.connect(set_paused.bind(true))
+	tr.add_child(pb)
 
 	var zi := big_button(" + ")
 	zi.pressed.connect(func(): zoom(-0.15))
@@ -1251,20 +1275,154 @@ func build_ui() -> void:
 	var hv := VBoxContainer.new()
 	hv.add_theme_constant_override("separation", 12)
 	help_panel.add_child(hv)
-	var title := Label.new()
-	title.text = "Welcome to Barry's Barn!"
-	title.add_theme_font_size_override("font_size", 36)
-	title.add_theme_color_override("font_color", Color(1, 0.85, 0.3))
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	hv.add_child(title)
-	var body := Label.new()
-	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	body.custom_minimum_size = Vector2(620, 0)
-	body.text = "- Pick a seed on the right, then tap a dirt plot to plant it.\n- Tap bouncing crops to harvest (they replant by themselves).\n- Tap animals when an egg or milk floats over them.\n- Build stations to turn crops into tastier goods.\n- Cars stop at your stand. Tap a car to sell what it wants before it gets bored!\n- Level up to unlock new seeds, animals and stations.\n- Drag to look around, use + / - to zoom."
-	hv.add_child(body)
-	var ok := big_button("Let's farm!")
-	ok.pressed.connect(func(): help_panel.visible = false; seen_help = true; save_game())
-	hv.add_child(ok)
+	help_title = Label.new()
+	help_title.add_theme_font_size_override("font_size", 36)
+	help_title.add_theme_color_override("font_color", Color(1, 0.85, 0.3))
+	help_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hv.add_child(help_title)
+	help_body = Label.new()
+	help_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	help_body.custom_minimum_size = Vector2(680, 300)
+	hv.add_child(help_body)
+	help_page_lbl = Label.new()
+	help_page_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	help_page_lbl.add_theme_font_size_override("font_size", 20)
+	hv.add_child(help_page_lbl)
+	var nav := HBoxContainer.new()
+	nav.alignment = BoxContainer.ALIGNMENT_CENTER
+	nav.add_theme_constant_override("separation", 16)
+	hv.add_child(nav)
+	help_prev = big_button("  < Back  ")
+	help_prev.pressed.connect(func(): show_help(help_page - 1))
+	nav.add_child(help_prev)
+	help_next = big_button("  Next >  ")
+	help_next.pressed.connect(func(): show_help(help_page + 1))
+	nav.add_child(help_next)
+	var ok := big_button("  Let's farm!  ")
+	ok.pressed.connect(close_help)
+	nav.add_child(ok)
+	help_panel.visible = false
+
+	pause_panel = center_panel(root)
+	var pv := VBoxContainer.new()
+	pv.add_theme_constant_override("separation", 14)
+	pause_panel.add_child(pv)
+	var pt := Label.new()
+	pt.text = "Paused"
+	pt.add_theme_font_size_override("font_size", 44)
+	pt.add_theme_color_override("font_color", Color(1, 0.85, 0.3))
+	pt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	pv.add_child(pt)
+	var resume := big_button("Resume")
+	resume.custom_minimum_size = Vector2(420, 72)
+	resume.pressed.connect(set_paused.bind(false))
+	pv.add_child(resume)
+	var howto := big_button("How to Play")
+	howto.pressed.connect(func(): pause_panel.visible = false; show_help(0))
+	pv.add_child(howto)
+	mute_btn = big_button("")
+	mute_btn.pressed.connect(func(): muted = not muted; apply_mute(); save_game())
+	pv.add_child(mute_btn)
+	reset_btn = big_button("Start New Farm")
+	reset_btn.pressed.connect(reset_pressed)
+	pv.add_child(reset_btn)
+	pause_panel.visible = false
+	apply_mute()
+
+
+func help_pages() -> Array:
+	var recipes := []
+	for id in STATION_ORDER:
+		var st: Dictionary = STATIONS[id]
+		recipes.append("- %s (Lv %d): %s makes %s" % [st["n"], st["lvl"], recipe_text(st["in"]), item_name(st["out"])])
+	return [
+		["Welcome to Barry's Barn!", "Barry's farm stand sits next to a busy road. Grow crops, raise animals, cook tasty goods and sell them to the cars that stop by.\n\nEarn money to buy more plots, animals, stations and helpers. Selling also earns XP, and every new level unlocks something new.\n\nTap Next for a quick tour. You can open this again with the ? button."],
+		["Crops", "1. Pick a seed on the right side of the screen.\n2. Tap a brown dirt plot to plant it.\n3. When the crop starts bouncing it is ready: tap it to harvest 2.\n\nHarvested plots replant the same seed by themselves. Green plots are locked: tap the one marked \"Buy Plot\" to expand your field.\n\nWheat seeds are free, so you can never get stuck."],
+		["Animals", "Chickens lay eggs and cows give milk (cows unlock at level 3).\n\nWhen an egg or milk bucket floats above an animal, tap the animal to collect it.\n\nBuy more animals from the signs in front of the pen."],
+		["Kitchen Stations", "Stations turn raw items into goods that sell for much more. Tap an empty pad to build one, then tap it to start cooking. It keeps cooking by itself while you have ingredients. Tap it when it says READY to collect.\n\n" + "\n".join(recipes)],
+		["Selling", "Cars line up at the farm stand. Each shows what it wants, the price, and how long it will wait.\n\nTap a car to sell. If you don't have what it wants, keep farming: it will wait a while, and new cars ask for things you already have more often."],
+		["Helpers (automation)", "Tired of tapping? Hire helpers in the Upgrades menu. They keep working while you play:\n\n- Scarecrow Farmhand: harvests ripe crops\n- Barn Robot: collects eggs and milk\n- Kitchen Helper: collects and restarts stations\n- Stand Clerk: sells to cars when you have their order\n\nEach helper can be upgraded twice to work faster. With all four, your farm runs itself."],
+		["Controls & Tips", "- Tap: plant, harvest, collect, build, sell\n- Drag: move the camera\n- + / - buttons (or mouse wheel / pinch): zoom\n- II button: pause, sound, restart\n\nTips: build the Mill early, since flour sells for nearly 4x wheat. Hire the Stand Clerk first so cars never leave unhappy. The game saves by itself."],
+	]
+
+
+func show_help(page: int) -> void:
+	var pages := help_pages()
+	help_page = clampi(page, 0, pages.size() - 1)
+	help_title.text = pages[help_page][0]
+	help_body.text = pages[help_page][1]
+	help_page_lbl.text = "Page %d of %d" % [help_page + 1, pages.size()]
+	help_prev.disabled = help_page == 0
+	help_next.disabled = help_page == pages.size() - 1
+	upg_panel.visible = false
+	help_panel.visible = true
+	get_tree().paused = true
+
+
+func close_help() -> void:
+	help_panel.visible = false
+	get_tree().paused = false
+	if not seen_help:
+		seen_help = true
+		save_game()
+
+
+func set_paused(p: bool) -> void:
+	get_tree().paused = p
+	pause_panel.visible = p
+	upg_panel.visible = false
+	help_panel.visible = false
+	reset_btn.text = "Start New Farm"
+
+
+func apply_mute() -> void:
+	AudioServer.set_bus_mute(0, muted)
+	mute_btn.text = "Sound: OFF" if muted else "Sound: ON"
+
+
+func reset_pressed() -> void:
+	if reset_btn.text != "Tap again to erase your farm!":
+		reset_btn.text = "Tap again to erase your farm!"
+		return
+	resetting = true
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
+	get_tree().paused = false
+	get_tree().reload_current_scene()
+
+
+func update_helpers(delta: float) -> void:
+	for h in HELPERS:
+		var lv: int = upg[h]
+		if lv == 0:
+			continue
+		helper_timers[h] = float(helper_timers.get(h, 0.0)) - delta
+		if helper_timers[h] > 0.0:
+			continue
+		helper_timers[h] = HELPER_INTERVAL[lv]
+		match h:
+			"farmhand":
+				for i in PLOT_COUNT:
+					var p: Dictionary = plots[i]
+					if p["open"] and p["crop"] != "" and p["t"] >= CROPS[p["crop"]]["t"]:
+						tap_plot(i)
+						break
+			"collector":
+				for i in animals.size():
+					if animals[i]["t"] >= ANIMALS[animals[i]["type"]]["t"]:
+						tap_animal(i)
+						break
+			"chef":
+				for id in STATION_ORDER:
+					var s: Dictionary = stations[id]
+					if s["own"] and (s["ready"] > 0 or (not s["busy"] and station_can_start(id))):
+						tap_station(id)
+						break
+			"seller":
+				for c in cars:
+					var n: Node3D = c["node"]
+					if not c["leaving"] and absf(n.position.x - STAND_X) < 13.0 and have(c["want"]) >= c["qty"]:
+						tap_car(n.get_instance_id())
+						break
 
 
 func big_button(text: String) -> Button:
@@ -1320,17 +1478,23 @@ func build_upgrade_panel() -> void:
 	t.add_theme_font_size_override("font_size", 34)
 	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	upg_box.add_child(t)
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 10)
+	grid.add_theme_constant_override("v_separation", 10)
+	upg_box.add_child(grid)
 	for id in UPGRADE_ORDER:
 		var u: Dictionary = UPGRADES[id]
 		var b := big_button("")
-		b.custom_minimum_size = Vector2(560, 72)
-		if upg[id] >= UPGRADE_MAX:
+		b.custom_minimum_size = Vector2(440, 76)
+		b.add_theme_font_size_override("font_size", 20)
+		if upg[id] >= u["max"]:
 			b.text = "%s (MAX)\n%s" % [u["n"], u["d"]]
 			b.disabled = true
 		else:
 			b.text = "%s  Lv %d  -  $%d\n%s" % [u["n"], upg[id] + 1, upgrade_cost(id), u["d"]]
 			b.pressed.connect(func(): buy_upgrade(id))
-		upg_box.add_child(b)
+		grid.add_child(b)
 	var close := big_button("Close")
 	close.pressed.connect(func(): upg_panel.visible = false)
 	upg_box.add_child(close)
@@ -1367,8 +1531,10 @@ func toast(msg: String, dur := 2.0) -> void:
 # ================= save / load =================
 
 func save_game() -> void:
+	if resetting:
+		return
 	var d := {"coins": coins, "xp": xp, "level": level, "inv": inv, "plots": plots, "stations": stations,
-		"animals": animals, "upg": upg, "sel": sel_crop, "help": seen_help}
+		"animals": animals, "upg": upg, "sel": sel_crop, "help": seen_help, "muted": muted}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
 		f.store_string(JSON.stringify(d))
@@ -1398,6 +1564,7 @@ func load_game() -> void:
 	animals = []
 	for a in d.get("animals", []):
 		animals.append({"type": str(a["type"]), "t": float(a["t"])})
+	muted = bool(d.get("muted", false))
 	var u: Dictionary = d.get("upg", {})
 	for k in u:
 		if upg.has(k):
