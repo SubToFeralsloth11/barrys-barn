@@ -27,9 +27,14 @@ const ITEMS := {
 	"wool": {"n": "Wool", "p": 40, "c": Color(0.97, 0.97, 0.95)},
 	"smoothie": {"n": "Berry Smoothie", "p": 110, "c": Color(0.6, 0.4, 0.85)},
 	"sweater": {"n": "Wool Sweater", "p": 140, "c": Color(0.85, 0.3, 0.35)},
+	"coffee": {"n": "Coffee Beans", "p": 9, "c": Color(0.55, 0.3, 0.15)},
+	"tomato": {"n": "Tomato", "p": 11, "c": Color(0.95, 0.2, 0.12)},
+	"hot_coffee": {"n": "Hot Coffee", "p": 30, "c": Color(0.45, 0.28, 0.15)},
+	"plane_meal": {"n": "Plane Meal", "p": 95, "c": Color(0.9, 0.8, 0.6)},
+	"pizza": {"n": "Pizza", "p": 150, "c": Color(0.95, 0.6, 0.25)},
 }
-const ITEM_ORDER := ["wheat", "carrot", "strawberry", "corn", "pumpkin", "sunflower", "blueberry", "melon", "apple", "egg", "milk", "bacon", "wool", "flour", "juice", "jam", "cheese", "bread", "popcorn", "pie", "cider", "smoothie", "sweater", "golden"]
-const CROP_ORDER := ["wheat", "carrot", "strawberry", "corn", "pumpkin", "sunflower", "blueberry", "melon"]
+const ITEM_ORDER := ["wheat", "carrot", "strawberry", "corn", "pumpkin", "sunflower", "blueberry", "melon", "coffee", "tomato", "apple", "egg", "milk", "bacon", "wool", "flour", "juice", "jam", "cheese", "bread", "popcorn", "pie", "cider", "smoothie", "sweater", "hot_coffee", "plane_meal", "pizza", "golden"]
+const CROP_ORDER := ["wheat", "carrot", "strawberry", "corn", "pumpkin", "sunflower", "blueberry", "melon", "coffee", "tomato"]
 const CROPS := {
 	"wheat": {"t": 8.0, "lvl": 1, "seed": 0},
 	"carrot": {"t": 14.0, "lvl": 2, "seed": 2},
@@ -39,8 +44,10 @@ const CROPS := {
 	"sunflower": {"t": 45.0, "lvl": 8, "seed": 12},
 	"blueberry": {"t": 50.0, "lvl": 10, "seed": 15},
 	"melon": {"t": 70.0, "lvl": 12, "seed": 22},
+	"coffee": {"t": 16.0, "lvl": 2, "seed": 3},
+	"tomato": {"t": 18.0, "lvl": 3, "seed": 4},
 }
-const STATION_ORDER := ["mill", "juicer", "dairy", "bakery", "popper", "oven", "jam", "press", "blender", "loom"]
+const STATION_ORDER := ["mill", "juicer", "dairy", "bakery", "popper", "oven", "jam", "press", "blender", "loom", "brewer", "meal", "pizza"]
 const STATIONS := {
 	"mill": {"n": "Mill", "in": {"wheat": 2}, "out": "flour", "t": 6.0, "cost": 40, "lvl": 1, "c": Color(0.85, 0.75, 0.55)},
 	"juicer": {"n": "Juicer", "in": {"carrot": 2}, "out": "juice", "t": 8.0, "cost": 120, "lvl": 2, "c": Color(1.0, 0.65, 0.3)},
@@ -52,6 +59,9 @@ const STATIONS := {
 	"press": {"n": "Cider Press", "in": {"apple": 3}, "out": "cider", "t": 14.0, "cost": 600, "lvl": 9, "c": Color(0.7, 0.5, 0.3)},
 	"blender": {"n": "Smoothie Bar", "in": {"blueberry": 2, "milk": 1}, "out": "smoothie", "t": 12.0, "cost": 1200, "lvl": 11, "c": Color(0.7, 0.55, 0.9)},
 	"loom": {"n": "Loom", "in": {"wool": 2}, "out": "sweater", "t": 18.0, "cost": 1800, "lvl": 13, "c": Color(0.9, 0.7, 0.75)},
+	"brewer": {"n": "Coffee Machine", "in": {"coffee": 2}, "out": "hot_coffee", "t": 8.0, "cost": 150, "lvl": 2, "c": Color(0.6, 0.45, 0.35)},
+	"meal": {"n": "Meal Cart", "in": {"bread": 1, "egg": 1, "carrot": 1}, "out": "plane_meal", "t": 14.0, "cost": 700, "lvl": 6, "c": Color(0.75, 0.8, 0.9)},
+	"pizza": {"n": "Pizza Oven", "in": {"flour": 1, "cheese": 1, "tomato": 2}, "out": "pizza", "t": 15.0, "cost": 900, "lvl": 6, "c": Color(0.85, 0.4, 0.3)},
 }
 const ANIMAL_ORDER := ["chicken", "cow", "pig", "sheep"]
 ## h = height the ready product floats at, spd = walk speed.
@@ -126,8 +136,24 @@ const QUESTS := [
 	{"n": "Sell to 1000 cars", "k": "cars", "g": 1000, "r": 6000},
 	{"n": "Earn 5 Farm Stars", "k": "stars", "g": 5, "r": 15000},
 ]
-## Retiring (prestige) needs this level and trades the farm for Farm Stars.
+## Moving on (prestige) needs this level: the farm restarts at the next place and you earn Farm Stars.
 const RETIRE_LVL := 15
+## Places you move through when you reach RETIRE_LVL. pay = sale money multiplier, cust = customer vehicle.
+const LOCATIONS := {
+	"farm": {"n": "Barry's Farm", "next": "plane", "pay": 1.0, "cust": "car",
+		"crops": ["wheat", "carrot", "strawberry", "corn", "pumpkin", "sunflower", "blueberry", "melon"],
+		"animals": ["chicken", "cow", "pig", "sheep"],
+		"stations": ["mill", "juicer", "dairy", "bakery", "popper", "oven", "jam", "press", "blender", "loom"]},
+	"plane": {"n": "Sky Diner Plane", "next": "city", "pay": 1.5, "cust": "plane",
+		"crops": ["wheat", "coffee", "carrot", "strawberry", "corn", "blueberry"],
+		"animals": ["chicken"],
+		"stations": ["mill", "brewer", "juicer", "bakery", "jam", "popper", "meal"]},
+	"city": {"n": "City Rooftop", "next": "", "pay": 2.0, "cust": "car",
+		"crops": ["wheat", "carrot", "tomato", "strawberry", "corn", "pumpkin"],
+		"animals": ["chicken", "cow"],
+		"stations": ["mill", "juicer", "dairy", "bakery", "jam", "popper", "oven", "pizza"]},
+}
+const MAX_CREW := 3
 
 # --- saved state ---
 var coins := 50
@@ -140,6 +166,16 @@ var animals := []
 var upg := {"farmhand": 0, "collector": 0, "chef": 0, "seller": 0, "fert": 0, "feed": 0, "sign": 0, "fame": 0}
 ## Farm Stars from retiring: +10% sale money and +5% growth each. Kept forever.
 var stars := 0
+## Which place the farm is in (see LOCATIONS), and the lists that place uses.
+var loc := "farm"
+var crop_order: Array = []
+var station_order: Array = []
+var animal_order: Array = []
+## Number of robots of each helper type (1..MAX_CREW).
+var crew := {}
+var clouds := []
+var menu_panel: PanelContainer
+var menu_btn: Button
 var muted := false
 var helper_timers := {}
 var collector_next := 0
@@ -201,7 +237,7 @@ var ui_level: Label
 var ui_xp: ProgressBar
 var ui_inv: Label
 var ui_toast: Label
-var seed_box: VBoxContainer
+var seed_box: GridContainer
 var upg_panel: PanelContainer
 var upg_box: VBoxContainer
 var help_panel: PanelContainer
@@ -229,6 +265,7 @@ func _ready() -> void:
 	randomize()
 	new_game_state()
 	load_game()
+	apply_location()
 	fill_orders()
 	build_sounds()
 	build_world()
@@ -238,7 +275,7 @@ func _ready() -> void:
 		spawn_plot_node(i)
 		refresh_plot(i)
 	refresh_field()
-	for id in STATION_ORDER:
+	for id in station_order:
 		refresh_station(id)
 	for i in animals.size():
 		spawn_animal_node(i)
@@ -254,7 +291,7 @@ func new_game_state() -> void:
 	plots.clear()
 	for i in 4:
 		plots.append({"x": i, "z": 0, "crop": "", "t": 0.0, "gold": false})
-	for id in STATION_ORDER:
+	for id in STATIONS:
 		stations[id] = {"own": false, "busy": false, "t": 0.0, "ready": 0}
 	animals = [{"type": "chicken", "t": 0.0}]
 	inv = {}
@@ -506,8 +543,8 @@ func build_world() -> void:
 	var sky_mat := ProceduralSkyMaterial.new()
 	sky_mat.sky_top_color = Color(0.32, 0.6, 0.95)
 	sky_mat.sky_horizon_color = Color(0.75, 0.88, 1.0)
-	sky_mat.ground_horizon_color = Color(0.6, 0.75, 0.55)
-	sky_mat.ground_bottom_color = Color(0.3, 0.45, 0.25)
+	sky_mat.ground_horizon_color = Color(0.75, 0.88, 1.0) if loc == "plane" else Color(0.6, 0.75, 0.55)
+	sky_mat.ground_bottom_color = Color(0.55, 0.75, 1.0) if loc == "plane" else Color(0.3, 0.45, 0.25)
 	var sky := Sky.new()
 	sky.sky_material = sky_mat
 	e.background_mode = Environment.BG_SKY
@@ -535,17 +572,22 @@ func build_world() -> void:
 	update_camera()
 
 	# ground, road
-	box(self, Vector3(140, 1, 120), Vector3(0, -0.5, 0), Color(0.36, 0.64, 0.26))
-	box(self, Vector3(140, 0.06, 4.6), Vector3(0, 0.03, 11.2), Color(0.3, 0.3, 0.33))
-	for i in 28:
-		box(self, Vector3(1.8, 0.07, 0.18), Vector3(-67 + i * 5, 0.04, 11.2), Color(1, 0.95, 0.6))
-	box(self, Vector3(140, 0.08, 0.3), Vector3(0, 0.04, 8.9), Color(0.85, 0.85, 0.8))
-
-	build_barn()
+	match loc:
+		"plane":
+			build_plane_deck()
+		"city":
+			box(self, Vector3(140, 1, 120), Vector3(0, -0.5, 0), Color(0.42, 0.42, 0.45))
+			box(self, Vector3(140, 0.05, 2.0), Vector3(0, 0.02, 7.9), Color(0.7, 0.7, 0.68))
+			build_road()
+			build_city_decor()
+		_:
+			box(self, Vector3(140, 1, 120), Vector3(0, -0.5, 0), Color(0.36, 0.64, 0.26))
+			build_road()
+			build_barn()
+			build_decor()
+			build_orchard()
 	build_stand()
 	build_pen()
-	build_decor()
-	build_orchard()
 	build_rain()
 
 	# one tap target covers the biggest farm; plots and build ghosts sit on top of it
@@ -559,8 +601,8 @@ func build_world() -> void:
 	add_hit(self, Vector3(fb.size.x, 0.1, fb.size.y), Vector3(fb.get_center().x, 0.05, fb.get_center().y), "field", 0)
 
 	# stations
-	for i in STATION_ORDER.size():
-		var id: String = STATION_ORDER[i]
+	for i in station_order.size():
+		var id: String = station_order[i]
 		var root := node_at(self, station_pos(i))
 		var pad := box(root, Vector3(3.0, 0.1, 2.6), Vector3(0, 0.05, 0), Color(0.7, 0.68, 0.6))
 		var bld := node_at(root, Vector3.ZERO)
@@ -573,6 +615,73 @@ func build_world() -> void:
 
 func station_pos(i: int) -> Vector3:
 	return Vector3(-3.0 + i * 3.6, 0, 3.0)
+
+
+func build_road() -> void:
+	box(self, Vector3(140, 0.06, 4.6), Vector3(0, 0.03, 11.2), Color(0.3, 0.3, 0.33))
+	for i in 28:
+		box(self, Vector3(1.8, 0.07, 0.18), Vector3(-67 + i * 5, 0.04, 11.2), Color(1, 0.95, 0.6))
+	box(self, Vector3(140, 0.08, 0.3), Vector3(0, 0.04, 8.9), Color(0.85, 0.85, 0.8))
+
+
+## The Sky Diner: the farm sits on top of a huge plane; customers fly up to the side door.
+func build_plane_deck() -> void:
+	var hull := Color(0.88, 0.9, 0.93)
+	var blue := Color(0.2, 0.35, 0.8)
+	box(self, Vector3(110, 1.0, 30), Vector3(0, -0.5, -6.1), hull)
+	box(self, Vector3(110, 0.35, 0.3), Vector3(0, 0.0, 8.95), blue)
+	box(self, Vector3(110, 0.35, 0.3), Vector3(0, 0.0, -21.15), blue)
+	for i in 36:
+		var x := -54.0 + i * 3.0
+		box(self, Vector3(1.0, 0.4, 0.05), Vector3(x, -0.55, 8.98), Color(0.25, 0.45, 0.75))
+		if absf(x - STAND_X) > 3.0:
+			box(self, Vector3(0.1, 0.9, 0.1), Vector3(x, 0.45, 8.85), Color(0.75, 0.75, 0.8))
+	box(self, Vector3(110, 0.08, 0.08), Vector3(0, 0.9, 8.85), Color(0.75, 0.75, 0.8))
+	# side door the stand sells out of
+	box(self, Vector3(4.0, 0.06, 1.6), Vector3(STAND_X, 0.03, 8.4), Color(1.0, 0.8, 0.2))
+	label3d(self, "SIDE DOOR", Vector3(STAND_X, 0.1, 8.4), 40, false).rotation_degrees.x = -90
+	# wings and tail
+	box(self, Vector3(16, 0.5, 40), Vector3(-4, -1.6, -41), hull.darkened(0.08))
+	box(self, Vector3(16, 0.5, 18), Vector3(-4, -1.6, 18), hull.darkened(0.08))
+	box(self, Vector3(8, 9, 0.6), Vector3(52, 4, -6.1), blue)
+	sph(self, 15.0, Vector3(-55, -1.0, -6.1), hull, Vector3(1.0, 0.25, 1.0), 24)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 11
+	for i in 26:
+		var c := node_at(self, Vector3(rng.randf_range(-70, 70), rng.randf_range(-14, -6), rng.randf_range(-50, 40)))
+		for k in 4:
+			sph(c, rng.randf_range(2.0, 3.5), Vector3(k * 2.4 - 3.6, rng.randf_range(-0.5, 0.8), rng.randf_range(-1.0, 1.0)), Color(1, 1, 1))
+		bake(c)
+		clouds.append(c)
+
+
+func update_clouds(delta: float) -> void:
+	for c: Node3D in clouds:
+		c.position.x += delta * 9.0
+		if c.position.x > 75:
+			c.position.x = -75
+
+
+## City: tall buildings all around instead of trees.
+func build_city_decor() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5
+	var cols := [Color(0.75, 0.55, 0.45), Color(0.6, 0.65, 0.75), Color(0.85, 0.8, 0.65), Color(0.5, 0.55, 0.6), Color(0.8, 0.6, 0.6)]
+	for i in 70:
+		var p := Vector3(rng.randf_range(-60, 60), 0, rng.randf_range(-45, 35))
+		if p.z > 5.5 and p.z < 16.0:
+			continue
+		if p.x > -36 and p.x < 34 and p.z > -22 and p.z < 7:
+			continue
+		var b := node_at(self, p)
+		var w := rng.randf_range(4, 7)
+		var h := rng.randf_range(6, 20)
+		var col: Color = cols[rng.randi() % cols.size()]
+		box(b, Vector3(w, h, w), Vector3(0, h / 2, 0), col)
+		for y in range(2, int(h) - 1, 2):
+			box(b, Vector3(w + 0.05, 0.6, w * 0.8), Vector3(0, y, 0), Color(0.35, 0.5, 0.7))
+		box(b, Vector3(w + 0.3, 0.3, w + 0.3), Vector3(0, h, 0), col.darkened(0.3))
+		bake(b)
 
 
 func build_barn() -> void:
@@ -654,8 +763,8 @@ func build_pen() -> void:
 	box(coop, Vector3(1.4, 1.0, 1.0), Vector3(0, 0.7, 0), Color(0.95, 0.85, 0.6))
 	prism(coop, Vector3(1.6, 0.6, 1.2), Vector3(0, 1.5, 0), Color(0.75, 0.15, 0.12))
 	# buy signs
-	for i in ANIMAL_ORDER.size():
-		var id: String = ANIMAL_ORDER[i]
+	for i in animal_order.size():
+		var id: String = animal_order[i]
 		var sn := node_at(self, Vector3(1.6 + i * 3.4, 0, -2.4))
 		box(sn, Vector3(0.12, 1.2, 0.12), Vector3(0, 0.6, 0), WOOD)
 		box(sn, Vector3(2.3, 1.05, 0.08), Vector3(0, 1.4, -0.02), WOOD)
@@ -736,6 +845,12 @@ func build_station_model(id: String, b: Node3D) -> void:
 			cyl(spin, 0.3, 0.3, 0.1, Vector3.ZERO, Color(0.95, 0.55, 0.2), 10).rotation_degrees.x = 90
 		"jam":
 			cyl(spin, 0.26, 0.22, 0.36, Vector3.ZERO, Color(0.85, 0.15, 0.3), 12)
+		"brewer":
+			cyl(spin, 0.22, 0.26, 0.45, Vector3.ZERO, Color(0.25, 0.2, 0.2), 12)
+		"meal":
+			box(spin, Vector3(0.6, 0.12, 0.45), Vector3.ZERO, Color(0.95, 0.95, 0.95))
+		"pizza":
+			cyl(spin, 0.35, 0.35, 0.06, Vector3.ZERO, Color(0.95, 0.6, 0.25), 14).rotation_degrees.x = 90
 		"press":
 			cyl(spin, 0.32, 0.32, 0.5, Vector3.ZERO, Color(0.55, 0.35, 0.2), 12).rotation_degrees.x = 90
 
@@ -861,6 +976,10 @@ func make_crop(type: String, stage: int, gold: bool, parent: Node3D, seed_i: int
 				grow_blueberry(c, stage, rng)
 			"melon":
 				grow_melon(c, stage, rng)
+			"coffee":
+				grow_blueberry(c, stage, rng, Color(0.6, 0.12, 0.1))
+			"tomato":
+				grow_blueberry(c, stage, rng, Color(0.95, 0.18, 0.1))
 	if gold and stage == 3:
 		gild(c)
 	bake(c)
@@ -965,13 +1084,14 @@ func grow_pumpkin(c: Node3D, s: int, rng: RandomNumberGenerator) -> void:
 		cyl(c, 0.03, 0.045, 0.16, o + Vector3(0, r * 1.45, 0), Color(0.4, 0.45, 0.2), 6)
 
 
-func grow_blueberry(c: Node3D, s: int, rng: RandomNumberGenerator) -> void:
+## A round bush with berries; also used for coffee and tomatoes in other colours.
+func grow_blueberry(c: Node3D, s: int, rng: RandomNumberGenerator, berry := Color(0.25, 0.3, 0.85)) -> void:
 	for o: Vector3 in SPOTS:
 		var r := 0.12 + 0.06 * s
 		sph(c, r, o + Vector3(0, r * 0.8, 0), LEAF.darkened(0.1 + rng.randf() * 0.1), Vector3(1, 0.85, 1), 10)
 		if s < 2:
 			continue
-		var col := Color(0.55, 0.75, 0.4) if s == 2 else Color(0.25, 0.3, 0.85)
+		var col := Color(0.55, 0.75, 0.4) if s == 2 else berry
 		for k in 5:
 			var a := k * TAU / 5 + rng.randf()
 			fr(sph(c, 0.045, o + Vector3(cos(a) * r * 0.9, r * (0.6 + rng.randf() * 0.6), sin(a) * r * 0.9), col, Vector3.ONE, 8))
@@ -1549,7 +1669,7 @@ func buy_animal(type: String) -> void:
 
 
 func refresh_pen_signs() -> void:
-	for id in ANIMAL_ORDER:
+	for id in animal_order:
 		var sn: Node3D = get_node("Sign_" + id)
 		var l: Label3D = sn.get_meta("label")
 		var ad: Dictionary = ANIMALS[id]
@@ -1595,13 +1715,13 @@ func update_animals(delta: float) -> void:
 
 func available_goods() -> Array:
 	var out := []
-	for c in CROP_ORDER:
+	for c in crop_order:
 		if level >= CROPS[c]["lvl"]:
 			out.append(c)
-	for t in ANIMAL_ORDER:
+	for t in animal_order:
 		if animal_count(t) > 0:
 			out.append(ANIMALS[t]["out"])
-	for s in STATION_ORDER:
+	for s in station_order:
 		if stations[s]["own"]:
 			out.append(STATIONS[s]["out"])
 	if orchard:
@@ -1633,11 +1753,11 @@ func spawn_car() -> void:
 			want = goods[k]
 			break
 	var qty := 1 + randi() % mini(4, 1 + int(level / 2.0))
-	var pay := int(ceil(ITEMS[want]["p"] * qty * 1.6 * (1.0 + 0.1 * upg["fame"]) * star_mult()))
+	var pay := int(ceil(ITEMS[want]["p"] * qty * 1.6 * (1.0 + 0.1 * upg["fame"]) * star_mult() * loc_pay()))
 	if want == hot:
 		pay *= 2
-	var n := build_car(CAR_COLORS[randi() % CAR_COLORS.size()])
-	n.position = Vector3(-48, 0, LANE_Z)
+	var n := build_customer(CAR_COLORS[randi() % CAR_COLORS.size()])
+	n.position = Vector3(-48, cust_y(), LANE_Z)
 	var lbl := label3d(n, "", Vector3(0, 2.7, 0), 40)
 	add_hit(n, Vector3(3.0, 2.2, 1.8), Vector3(0, 1.0, 0), "car", n.get_instance_id())
 	var patience := 45.0 + level * 3.0
@@ -1756,8 +1876,8 @@ func update_cars(delta: float) -> void:
 	ambient_timer -= delta
 	if ambient_timer <= 0:
 		ambient_timer = randf_range(4.0, 9.0)
-		var a := build_car(CAR_COLORS[randi() % CAR_COLORS.size()])
-		a.position = Vector3(55, 0, 12.4)
+		var a := build_customer(CAR_COLORS[randi() % CAR_COLORS.size()])
+		a.position = Vector3(55, cust_y() * 3.0, 12.4 + (6.0 if loc == "plane" else 0.0))
 		a.rotation_degrees.y = 180
 		ambient.append(a)
 	for i in range(ambient.size() - 1, -1, -1):
@@ -1783,13 +1903,13 @@ func gain_xp(n: int) -> void:
 		leveled = true
 	if leveled:
 		var unlocks := []
-		for c in CROP_ORDER:
+		for c in crop_order:
 			if CROPS[c]["lvl"] == level:
 				unlocks.append(item_name(c) + " seeds")
-		for s in STATION_ORDER:
+		for s in station_order:
 			if STATIONS[s]["lvl"] == level:
 				unlocks.append(STATIONS[s]["n"])
-		for a in ANIMAL_ORDER:
+		for a in animal_order:
 			if ANIMALS[a]["lvl"] == level:
 				unlocks.append(ANIMALS[a]["n"] + "s")
 		for k in range(1, LAND_LVL.size()):
@@ -1801,7 +1921,7 @@ func gain_xp(n: int) -> void:
 		coins += bonus
 		var msg := "LEVEL %d!  +$%d" % [level, bonus]
 		if level == RETIRE_LVL:
-			unlocks.append("Retiring for Farm Stars (Upgrades menu)")
+			unlocks.append("Moving on for Farm Stars (Upgrades menu)")
 		if unlocks.size() > 0:
 			msg += "  Unlocked: " + ", ".join(unlocks)
 		toast(msg, 4.0)
@@ -1845,7 +1965,7 @@ func new_order() -> Dictionary:
 		var q := 2 + randi() % (1 + mini(level, 6))
 		items[g] = q
 		value += ITEMS[g]["p"] * q
-	return {"items": items, "pay": int((value * 2.5 + 10 * level) * star_mult()), "xp": int(value * 0.6) + 5}
+	return {"items": items, "pay": int((value * 2.5 + 10 * level) * star_mult() * loc_pay()), "xp": int(value * 0.6) + 5}
 
 
 func fill_orders() -> void:
@@ -1946,7 +2066,7 @@ func _process(delta: float) -> void:
 			crop.rotation.z = sin(clock * 2.5 + i) * 0.05
 		else:
 			crop.scale = Vector3.ONE * lerpf(0.75, 1.0, prog)
-	for id in STATION_ORDER:
+	for id in station_order:
 		var s: Dictionary = stations[id]
 		var spin: Node3D = station_nodes[id]["spin"]
 		if s["busy"]:
@@ -1964,10 +2084,11 @@ func _process(delta: float) -> void:
 	update_helper_bodies(delta)
 	update_trees(delta)
 	update_weather(delta)
+	update_clouds(delta)
 	ui_timer -= delta
 	if ui_timer <= 0:
 		ui_timer = 0.25
-		for id in STATION_ORDER:
+		for id in station_order:
 			refresh_station(id)
 		ui_hint.text = hint_text()
 	save_timer -= delta
@@ -2142,55 +2263,57 @@ func build_ui() -> void:
 	tr.offset_top = 12
 	tr.add_theme_constant_override("separation", 10)
 	root.add_child(tr)
-	var ub := big_button("Upgrades")
-	ub.pressed.connect(func(): build_upgrade_panel(); upg_panel.visible = not upg_panel.visible; help_panel.visible = false; orders_panel.visible = false)
-	tr.add_child(ub)
-	var hb := big_button(" ? ")
-	hb.pressed.connect(func(): show_help(0))
-	tr.add_child(hb)
-	var pb := big_button(" Pause ")
-	pb.pressed.connect(set_paused.bind(true))
-	tr.add_child(pb)
-
-	var zi := big_button(" + ")
-	zi.pressed.connect(func(): zoom(-0.15))
-	tr.add_child(zi)
-	tr.move_child(zi, 0)
-	var zo := big_button(" - ")
-	zo.pressed.connect(func(): zoom(0.15))
-	tr.add_child(zo)
-	tr.move_child(zo, 1)
 	build_btn = big_button(" Build ")
 	build_btn.pressed.connect(toggle_build)
 	tr.add_child(build_btn)
-	tr.move_child(build_btn, 2)
-	orders_btn = big_button("Orders")
-	orders_btn.pressed.connect(func(): build_orders_panel(); orders_panel.visible = not orders_panel.visible; upg_panel.visible = false)
-	tr.add_child(orders_btn)
-	tr.move_child(orders_btn, 3)
 	assign_btn = big_button("Robot")
 	assign_btn.pressed.connect(toggle_assign)
 	tr.add_child(assign_btn)
-	tr.move_child(assign_btn, 3)
 	assign_all_btn = big_button("All")
 	assign_all_btn.pressed.connect(assign_all)
 	assign_all_btn.visible = false
 	tr.add_child(assign_all_btn)
-	tr.move_child(assign_all_btn, 4)
-	quests_btn = big_button("Quests")
-	quests_btn.pressed.connect(func(): build_quests_panel(); quests_panel.visible = not quests_panel.visible; upg_panel.visible = false; orders_panel.visible = false)
-	tr.add_child(quests_btn)
 	var harvest_btn := big_button("Harvest All")
 	harvest_btn.pressed.connect(harvest_all)
 	tr.add_child(harvest_btn)
-	tr.move_child(harvest_btn, 4)
+	menu_btn = big_button(" Menu ")
+	menu_btn.pressed.connect(func(): menu_panel.visible = not menu_panel.visible)
+	tr.add_child(menu_btn)
 
-	seed_box = VBoxContainer.new()
+	# everything else lives in a drop-down so the screen stays clear
+	menu_panel = PanelContainer.new()
+	menu_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	menu_panel.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	menu_panel.offset_right = -12
+	menu_panel.offset_top = 86
+	menu_panel.visible = false
+	root.add_child(menu_panel)
+	var mv := VBoxContainer.new()
+	mv.add_theme_constant_override("separation", 8)
+	menu_panel.add_child(mv)
+	orders_btn = menu_item(mv, "Orders", func(): build_orders_panel(); orders_panel.visible = true; upg_panel.visible = false; quests_panel.visible = false)
+	quests_btn = menu_item(mv, "Quests", func(): build_quests_panel(); quests_panel.visible = true; upg_panel.visible = false; orders_panel.visible = false)
+	menu_item(mv, "Upgrades", func(): build_upgrade_panel(); upg_panel.visible = true; orders_panel.visible = false; quests_panel.visible = false)
+	menu_item(mv, "Help", func(): show_help(0))
+	var zr := HBoxContainer.new()
+	zr.add_theme_constant_override("separation", 8)
+	mv.add_child(zr)
+	var zi := big_button("Zoom +")
+	zi.pressed.connect(func(): zoom(-0.15))
+	zr.add_child(zi)
+	var zo := big_button("Zoom -")
+	zo.pressed.connect(func(): zoom(0.15))
+	zr.add_child(zo)
+	menu_item(mv, "Pause", func(): set_paused(true))
+
+	seed_box = GridContainer.new()
+	seed_box.columns = 2
 	seed_box.set_anchors_and_offsets_preset(Control.PRESET_CENTER_RIGHT)
 	seed_box.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	seed_box.grow_vertical = Control.GROW_DIRECTION_BOTH
 	seed_box.offset_right = -12
-	seed_box.add_theme_constant_override("separation", 10)
+	seed_box.add_theme_constant_override("h_separation", 6)
+	seed_box.add_theme_constant_override("v_separation", 6)
 	root.add_child(seed_box)
 	build_seed_bar()
 
@@ -2298,7 +2421,7 @@ func build_ui() -> void:
 
 func help_pages() -> Array:
 	var recipes := []
-	for id in STATION_ORDER:
+	for id in station_order:
 		var st: Dictionary = STATIONS[id]
 		recipes.append("- %s (Lv %d): %s makes %s" % [st["n"], st["lvl"], recipe_text(st["in"]), item_name(st["out"])])
 	return [
@@ -2311,8 +2434,8 @@ func help_pages() -> Array:
 		["Orders & Streaks", "The Orders board has big deliveries that pay much more than cars. Deliver one and a new order arrives. Don't like one? Skip it.\n\nSell to cars back to back to build a sale streak: each car in a row pays 5% more, up to +50%. Let a car leave unhappy and the streak resets!"],
 		["Helpers (automation)", "Tired of tapping? Hire helpers in the Upgrades menu. They show up on the farm and keep working while you play:\n\n- Scarecrow Farmhand: harvests ripe crops (tap Robot to choose what it plants on each plot)\n- Barn Robot: collects eggs, milk, bacon and apples\n- Kitchen Helper: collects and restarts stations\n- Stand Clerk: sells to cars when you have their order\n\nEach helper can be upgraded twice to work faster. Change their colours with Helper Skins in Upgrades."],
 		["Extras", "- Weather: rain makes crops and apples grow 50% faster, a dry spell slows them down.\n- Hot crop: one crop sells for double each day (shown top left).\n- Feeding: tap a waiting animal to feed it 1 wheat and speed it up.\n- Golden crops also give a Golden Crop item. A golden limo comes by to buy them for 5x.\n- Quests: finish goals for coin rewards.\n- Orchard (level 9): apple trees, plus a Cider Press station."],
-		["Late game", "Every level-up pays a cash bonus.\n\n- Level 10: Blueberries\n- Level 11: Sheep (wool) and the Smoothie Bar\n- Level 12: Melons\n- Level 13: the Loom (wool sweaters)\n\nFertilizer, Tasty Feed and Good Reviews now go up to level 10.\n\nAt level %d you can RETIRE in the Upgrades menu: your farm starts over, but you earn Farm Stars. Each star gives +10%% sale money and +5%% growth forever. Quests, skins and stats are kept." % RETIRE_LVL],
-		["Controls & Tips", "- Tap: plant, harvest, collect, build, sell\n- Drag: move the camera\n- + / - buttons (or mouse wheel / pinch): zoom\n- Pause button (or Esc key): pause, sound, restart\n\nTips: build the Mill early, since flour sells for nearly 4x wheat. Hire the Stand Clerk first so cars never leave unhappy. The game saves by itself."],
+		["Late game", "Every level-up pays a cash bonus.\n\n- Level 10: Blueberries\n- Level 11: Sheep (wool) and the Smoothie Bar\n- Level 12: Melons\n- Level 13: the Loom (wool sweaters)\n\nFertilizer, Tasty Feed and Good Reviews go up to level 10. In Upgrades you can also buy up to %d robots of each helper.\n\nAt level %d you can MOVE ON in the Upgrades menu: you start over in a new place and earn Farm Stars (+10%% sale money and +5%% growth each, forever).\n\n- Sky Diner Plane: grow coffee, brew it, pack plane meals and sell out the side door to planes flying past. Pays 1.5x.\n- City Rooftop: tomatoes and pizza for city traffic. Pays 2x.\n\nQuests, skins and stats come with you." % [MAX_CREW, RETIRE_LVL]],
+		["Controls & Tips", "- Tap: plant, harvest, collect, build, sell\n- Drag: move the camera\n- Menu: orders, quests, upgrades, zoom, pause (mouse wheel / pinch also zoom, Esc pauses)\n\nTips: build the Mill early, since flour sells for nearly 4x wheat. Hire the Stand Clerk first so customers never leave unhappy. The game saves by itself."],
 	]
 
 
@@ -2367,53 +2490,80 @@ func update_helpers(delta: float) -> void:
 		var lv: int = upg[h]
 		if lv == 0:
 			continue
-		helper_timers[h] = float(helper_timers.get(h, 0.0)) - delta
-		if helper_timers[h] > 0.0:
-			continue
 		helper_timers[h] = HELPER_INTERVAL[lv]
-		match h:
-			"farmhand":
-				# ripe first, then empty plots that have a crop assigned
-				for i in plots.size():
-					var a := str(plots[i].get("assign", ""))
-					if ripe(plots[i]):
-						harvest_plot(i, a)
-						send_helper(h, plot_pos(i) + Vector3(0, 0, 1.3))
-						break
-					if plots[i]["crop"] == "" and a != "" and coins >= CROPS[a]["seed"]:
-						plant(i, true, a)
-						send_helper(h, plot_pos(i) + Vector3(0, 0, 1.3))
-						break
-			"collector":
-				# take turns round the pen and orchard so fast chickens can't starve anything else
-				var total := animals.size() + (trees.size() if orchard else 0)
-				for k in total:
-					var i := (collector_next + k) % total
-					if i < animals.size():
-						if animals[i]["t"] >= ANIMALS[animals[i]["type"]]["t"]:
-							collector_next = i + 1
-							tap_animal(i)
-							send_helper(h, animal_nodes[i]["node"].position + Vector3(0, 0, 0.9))
-							break
-					elif trees[i - animals.size()] >= APPLE_T:
+		for r in crew_size(h):
+			helper_act(h, r)
+
+
+## One robot r of helper type h does one job.
+func helper_act(h: String, r: int) -> void:
+	match h:
+		"farmhand":
+			# ripe first, then empty plots that have a crop assigned
+			for i in plots.size():
+				var a := str(plots[i].get("assign", ""))
+				if ripe(plots[i]):
+					harvest_plot(i, a)
+					send_helper(h, r, plot_pos(i) + Vector3(0, 0, 1.3))
+					return
+				if plots[i]["crop"] == "" and a != "" and coins >= CROPS[a]["seed"]:
+					plant(i, true, a)
+					send_helper(h, r, plot_pos(i) + Vector3(0, 0, 1.3))
+					return
+		"collector":
+			# take turns round the pen and orchard so fast chickens can't starve anything else
+			var total := animals.size() + (trees.size() if orchard else 0)
+			for k in total:
+				var i := (collector_next + k) % total
+				if i < animals.size():
+					if animals[i]["t"] >= ANIMALS[animals[i]["type"]]["t"]:
 						collector_next = i + 1
-						tap_tree(i - animals.size())
-						send_helper(h, TREE_SPOTS[i - animals.size()] + Vector3(0, 0, 1.6))
-						break
-			"chef":
-				for id in STATION_ORDER:
-					var s: Dictionary = stations[id]
-					if s["own"] and (s["ready"] > 0 or (not s["busy"] and station_can_start(id))):
-						tap_station(id)
-						send_helper(h, station_pos(STATION_ORDER.find(id)) + Vector3(0, 0, 1.9))
-						break
-			"seller":
-				for c in cars:
-					var n: Node3D = c["node"]
-					if not c["leaving"] and absf(n.position.x - STAND_X) < 13.0 and have(c["want"]) >= c["qty"]:
-						tap_car(n.get_instance_id())
-						send_helper(h, Vector3(clampf(n.position.x, STAND_X - 1.5, STAND_X + 1.5), 0, 6.5))
-						break
+						tap_animal(i)
+						send_helper(h, r, animal_nodes[i]["node"].position + Vector3(0, 0, 0.9))
+						return
+				elif trees[i - animals.size()] >= APPLE_T:
+					collector_next = i + 1
+					tap_tree(i - animals.size())
+					send_helper(h, r, TREE_SPOTS[i - animals.size()] + Vector3(0, 0, 1.6))
+					return
+		"chef":
+			for id in station_order:
+				var s: Dictionary = stations[id]
+				if s["own"] and (s["ready"] > 0 or (not s["busy"] and station_can_start(id))):
+					tap_station(id)
+					send_helper(h, r, station_pos(station_order.find(id)) + Vector3(0, 0, 1.9))
+					return
+		"seller":
+			for c in cars:
+				var n: Node3D = c["node"]
+				if not c["leaving"] and absf(n.position.x - STAND_X) < 13.0 and have(c["want"]) >= c["qty"]:
+					tap_car(n.get_instance_id())
+					send_helper(h, r, Vector3(clampf(n.position.x, STAND_X - 1.5, STAND_X + 1.5), 0, 6.5))
+					return
+
+
+func crew_size(h: String) -> int:
+	return clampi(int(crew.get(h, 1)), 1, MAX_CREW)
+
+
+func crew_cost(h: String) -> int:
+	return int(UPGRADES[h]["cost"]) * 4 * crew_size(h)
+
+
+func buy_crew(h: String) -> void:
+	if upg[h] == 0 or crew_size(h) >= MAX_CREW:
+		return
+	var cost := crew_cost(h)
+	if coins < cost:
+		toast("Need $%d" % cost)
+		play("nope")
+		return
+	coins -= cost
+	crew[h] = crew_size(h) + 1
+	play("build")
+	refresh_helpers()
+	refresh_ui()
+	build_upgrade_panel()
 
 
 # ================= helper bodies =================
@@ -2429,24 +2579,28 @@ func helper_home(h: String) -> Vector3:
 	return Vector3(STAND_X + 0.6, 0, 6.5)
 
 
-## Spawns a visible body for every hired helper that doesn't have one yet.
+## Spawns a visible body for every hired robot that doesn't have one yet.
 func refresh_helpers() -> void:
 	for h in HELPERS:
-		if upg[h] == 0 or helper_nodes.has(h):
+		if upg[h] == 0:
 			continue
-		var n := node_at(self, helper_home(h))
-		var body := node_at(n, Vector3.ZERO)
-		match h:
-			"farmhand":
-				build_scarecrow(body, helper_color(h))
-			"collector":
-				build_robot(body, helper_color(h), Color(0.3, 1.0, 0.6), "basket")
-			"chef":
-				build_robot(body, helper_color(h), Color(1.0, 0.7, 0.2), "chef")
-			"seller":
-				build_robot(body, helper_color(h), Color(0.3, 0.8, 1.0), "cap")
-		n.rotation.y = PI if h == "collector" else 0.0
-		helper_nodes[h] = {"node": n, "body": body, "target": n.position}
+		for r in crew_size(h):
+			var key := "%s%d" % [h, r]
+			if helper_nodes.has(key):
+				continue
+			var n := node_at(self, helper_home(h) + Vector3(r * 1.3, 0, 0))
+			var body := node_at(n, Vector3.ZERO)
+			match h:
+				"farmhand":
+					build_scarecrow(body, helper_color(h))
+				"collector":
+					build_robot(body, helper_color(h), Color(0.3, 1.0, 0.6), "basket")
+				"chef":
+					build_robot(body, helper_color(h), Color(1.0, 0.7, 0.2), "chef")
+				"seller":
+					build_robot(body, helper_color(h), Color(0.3, 0.8, 1.0), "cap")
+			n.rotation.y = PI if h == "collector" else 0.0
+			helper_nodes[key] = {"type": h, "node": n, "body": body, "target": n.position}
 
 
 func build_scarecrow(b: Node3D, shirt: Color) -> void:
@@ -2513,10 +2667,11 @@ func build_robot(b: Node3D, c: Color, eye: Color, hat: String) -> void:
 
 
 ## Points a helper at the spot it just worked on.
-func send_helper(h: String, spot: Vector3) -> void:
-	if helper_nodes.has(h):
-		helper_nodes[h]["target"] = spot
-		bounce(helper_nodes[h]["body"])
+func send_helper(h: String, r: int, spot: Vector3) -> void:
+	var key := "%s%d" % [h, r]
+	if helper_nodes.has(key):
+		helper_nodes[key]["target"] = spot
+		bounce(helper_nodes[key]["body"])
 
 
 func update_helper_bodies(delta: float) -> void:
@@ -2531,7 +2686,7 @@ func update_helper_bodies(delta: float) -> void:
 			n.position += to.normalized() * minf(4.5 * delta, to.length())
 			n.rotation.y = lerp_angle(n.rotation.y, atan2(to.x, to.z), delta * 8.0)
 		body.position.y = (absf(sin(clock * 12.0)) * 0.08 if moving else sin(clock * 2.0) * 0.04)
-		if h == "farmhand":
+		if hn["type"] == "farmhand":
 			body.rotation.z = sin(clock * 10.0) * 0.12 if moving else 0.0
 			continue
 		var swing := sin(clock * (10.0 if moving else 2.0)) * (0.6 if moving else 0.15)
@@ -2544,6 +2699,15 @@ func big_button(text: String) -> Button:
 	b.text = text
 	b.custom_minimum_size = Vector2(64, 64)
 	b.focus_mode = Control.FOCUS_NONE
+	return b
+
+
+## A full-width button in the drop-down menu; closes the menu when pressed.
+func menu_item(parent: Control, text: String, action: Callable) -> Button:
+	var b := big_button(text)
+	b.custom_minimum_size = Vector2(220, 60)
+	b.pressed.connect(func(): menu_panel.visible = false; action.call())
+	parent.add_child(b)
 	return b
 
 
@@ -2561,11 +2725,11 @@ func build_seed_bar() -> void:
 		return
 	for c in seed_box.get_children():
 		c.queue_free()
-	for id in CROP_ORDER:
+	for id in crop_order:
 		var cd: Dictionary = CROPS[id]
 		var b := big_button("")
-		b.custom_minimum_size = Vector2(150, 58)
-		b.add_theme_font_size_override("font_size", 20)
+		b.custom_minimum_size = Vector2(122, 52)
+		b.add_theme_font_size_override("font_size", 17)
 		if level < cd["lvl"]:
 			b.text = "%s\nLv %d" % [item_name(id), cd["lvl"]]
 			b.disabled = true
@@ -2598,6 +2762,11 @@ func build_upgrade_panel() -> void:
 	grid.add_theme_constant_override("h_separation", 10)
 	grid.add_theme_constant_override("v_separation", 10)
 	upg_box.add_child(grid)
+	var sc := ScrollContainer.new()
+	sc.custom_minimum_size = Vector2(900, 440)
+	sc.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	upg_box.add_child(sc)
+	grid.reparent(sc)
 	for id in UPGRADE_ORDER:
 		var u: Dictionary = UPGRADES[id]
 		var b := big_button("")
@@ -2610,22 +2779,37 @@ func build_upgrade_panel() -> void:
 			b.text = "%s  Lv %d  -  $%d\n%s" % [u["n"], upg[id] + 1, upgrade_cost(id), u["d"]]
 			b.pressed.connect(func(): buy_upgrade(id))
 		grid.add_child(b)
+	for h in HELPERS:
+		var b := big_button("")
+		b.custom_minimum_size = Vector2(440, 76)
+		b.add_theme_font_size_override("font_size", 20)
+		if upg[h] == 0:
+			b.text = "Extra %s\nHire one first" % UPGRADES[h]["n"]
+			b.disabled = true
+		elif crew_size(h) >= MAX_CREW:
+			b.text = "%s x%d (MAX)\nAll robots hired" % [UPGRADES[h]["n"], MAX_CREW]
+			b.disabled = true
+		else:
+			b.text = "Extra %s  -  $%d\nYou have %d, they all work at once" % [UPGRADES[h]["n"], crew_cost(h), crew_size(h)]
+			b.pressed.connect(buy_crew.bind(h))
+		grid.add_child(b)
 	var sk := big_button("Helper Skins")
 	sk.pressed.connect(build_skins_panel)
 	upg_box.add_child(sk)
 	var rb := big_button("")
 	rb.custom_minimum_size = Vector2(440, 76)
 	rb.add_theme_font_size_override("font_size", 20)
+	var dest: String = LOCATIONS[next_loc()]["n"]
 	if level < RETIRE_LVL:
-		rb.text = "Retire for Farm Stars\nReach level %d first" % RETIRE_LVL
+		rb.text = "Move to %s\nReach level %d first" % [dest, RETIRE_LVL]
 		rb.disabled = true
 	else:
-		rb.text = "Retire: start over for +%d Farm Star%s\n(you have %d)" % [stars_earned(), "" if stars_earned() == 1 else "s", stars]
+		rb.text = "Move to %s: start over there\n+%d Farm Star%s, sales x%.1f" % [dest, stars_earned(), "" if stars_earned() == 1 else "s", LOCATIONS[next_loc()]["pay"]]
 		rb.pressed.connect(func():
 			if rb.text.begins_with("Tap again"):
 				retire()
 			else:
-				rb.text = "Tap again to retire!\nYour farm restarts, stars are kept")
+				rb.text = "Tap again to move!\nThis place restarts, stars are kept")
 	upg_box.add_child(rb)
 	var close := big_button("Close")
 	close.pressed.connect(func(): upg_panel.visible = false)
@@ -2636,13 +2820,19 @@ func refresh_ui() -> void:
 	if ui_coins == null:
 		return
 	ui_coins.text = "$%d" % coins
-	ui_level.text = "Level %d" % level + ("   %d Farm Star%s" % [stars, "" if stars == 1 else "s"] if stars > 0 else "")
+	ui_level.text = "Level %d  -  %s" % [level, LOCATIONS[loc]["n"]] + ("\n%d Farm Star%s" % [stars, "" if stars == 1 else "s"] if stars > 0 else "")
 	ui_xp.max_value = xp_needed()
 	ui_xp.value = xp
 	var lines := []
+	var row := []
 	for id in ITEM_ORDER:
 		if have(id) > 0:
-			lines.append("%s  x%d" % [item_name(id), have(id)])
+			row.append("%s x%d" % [item_name(id), have(id)])
+			if row.size() == 2:
+				lines.append("   ".join(row))
+				row = []
+	if row.size() > 0:
+		lines.append(row[0])
 	ui_inv.text = "\n".join(lines) if lines.size() > 0 else "(basket empty)"
 	refresh_pen_signs()
 	refresh_sale_sign()
@@ -2663,6 +2853,8 @@ func refresh_ui() -> void:
 		ui_weather.text = "%s\nHot today: %s (x2 price)" % [WEATHER[weather]["n"], item_name(hot_crop())]
 	if quests_btn:
 		quests_btn.text = "Quests!" if quests_ready() > 0 else "Quests"
+	if menu_btn:
+		menu_btn.text = " Menu! " if orders_btn.text.ends_with("!") or quests_btn.text.ends_with("!") else " Menu "
 	refresh_orchard()
 
 
@@ -2687,13 +2879,62 @@ func stars_earned() -> int:
 	return 1 + maxi(0, int((level - RETIRE_LVL) / 5.0))
 
 
-## Prestige: keep stars, quests, stats and skins; everything else starts over.
+func loc_pay() -> float:
+	return float(LOCATIONS[loc]["pay"])
+
+
+## Where moving on takes you; the last place just restarts itself.
+func next_loc() -> String:
+	var n: String = LOCATIONS[loc]["next"]
+	return loc if n == "" else n
+
+
+## Sets the crops, stations and animals for the current place.
+func apply_location() -> void:
+	if not LOCATIONS.has(loc):
+		loc = "farm"
+	crop_order = LOCATIONS[loc]["crops"]
+	station_order = LOCATIONS[loc]["stations"]
+	animal_order = LOCATIONS[loc]["animals"]
+	if not crop_order.has(sel_crop):
+		sel_crop = crop_order[0]
+
+
+func cust_y() -> float:
+	return 0.4 if loc == "plane" else 0.0
+
+
+func build_customer(c: Color) -> Node3D:
+	return build_plane(c) if LOCATIONS[loc]["cust"] == "plane" else build_car(c)
+
+
+## A small passenger plane that pulls up beside the Sky Diner's side door.
+func build_plane(c: Color) -> Node3D:
+	var n := Node3D.new()
+	add_child(n)
+	var body := node_at(n, Vector3.ZERO)
+	body.name = "Body"
+	cyl(body, 0.55, 0.55, 3.6, Vector3(0, 1.0, 0), c, 16).rotation_degrees.z = 90
+	sph(body, 0.55, Vector3(1.8, 1.0, 0), c, Vector3(1.2, 1, 1))
+	sph(body, 0.5, Vector3(-1.8, 1.05, 0), c, Vector3(1.0, 0.8, 0.9))
+	skin(sph(body, 0.3, Vector3(2.1, 1.25, 0), Color(0.4, 0.6, 0.9), Vector3(1, 0.6, 1.6)), Color(0.4, 0.6, 0.9), 0.6)
+	box(body, Vector3(1.1, 0.08, 4.8), Vector3(0.1, 0.85, 0), Color(0.95, 0.95, 0.95))
+	box(body, Vector3(0.6, 0.9, 0.08), Vector3(-1.9, 1.6, 0), c.darkened(0.25))
+	box(body, Vector3(0.5, 0.06, 1.6), Vector3(-1.9, 1.15, 0), Color(0.95, 0.95, 0.95))
+	for k in 5:
+		box(body, Vector3(0.22, 0.18, 1.12), Vector3(-1.0 + k * 0.5, 1.2, 0), Color(0.3, 0.5, 0.8))
+	for z in [-1.4, 1.4]:
+		cyl(body, 0.16, 0.16, 0.6, Vector3(0.3, 0.7, z), Color(0.6, 0.62, 0.66), 10).rotation_degrees.z = 90
+	return n
+
+
+## Prestige: move to the next place. Keeps stars, quests, stats and skins; everything else starts over.
 func retire() -> void:
 	if level < RETIRE_LVL:
 		return
 	stars += stars_earned()
 	var d := {"stars": stars, "stats": stats, "claimed": claimed, "skins": skins, "help": true, "muted": muted,
-		"coins": 50 + 100 * stars, "animals": [{"type": "chicken", "t": 0.0}]}
+		"coins": 50 + 100 * stars, "animals": [{"type": "chicken", "t": 0.0}], "loc": next_loc()}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
 		f.store_string(JSON.stringify(d))
@@ -2710,7 +2951,7 @@ func stat(k: String, n := 1) -> void:
 ## The crop that sells for double today: picked from unlocked crops by the real date.
 func hot_crop() -> String:
 	var open := []
-	for c in CROP_ORDER:
+	for c in crop_order:
 		if level >= CROPS[c]["lvl"]:
 			open.append(c)
 	return open[absi(hash(Time.get_date_string_from_system())) % open.size()]
@@ -2769,10 +3010,10 @@ func limo_present() -> bool:
 ## A long golden car that only buys Golden Crops, at 5x their price.
 func spawn_limo() -> void:
 	var qty := mini(have("golden"), 1 + randi() % 2)
-	var pay := int(ITEMS["golden"]["p"] * qty * 5 * (1.0 + 0.1 * upg["fame"]) * star_mult())
-	var n := build_car(GOLD)
+	var pay := int(ITEMS["golden"]["p"] * qty * 5 * (1.0 + 0.1 * upg["fame"]) * star_mult() * loc_pay())
+	var n := build_customer(GOLD)
 	(n.get_node("Body") as Node3D).scale = Vector3(1.5, 1.0, 1.0)
-	n.position = Vector3(-48, 0, LANE_Z)
+	n.position = Vector3(-48, cust_y(), LANE_Z)
 	var lbl := label3d(n, "", Vector3(0, 2.7, 0), 40)
 	add_hit(n, Vector3(4.4, 2.2, 1.8), Vector3(0, 1.0, 0), "car", n.get_instance_id())
 	cars.append({"node": n, "want": "golden", "qty": qty, "pay": pay, "patience": 60.0, "max": 60.0, "label": lbl, "leaving": false, "limo": true})
@@ -2990,9 +3231,11 @@ func cycle_skin(h: String) -> void:
 		return
 	coins -= SKIN_COST
 	skins[h] = (int(skins.get(h, 0)) + 1) % SKIN_COLORS.size()
-	if helper_nodes.has(h):
-		(helper_nodes[h]["node"] as Node3D).queue_free()
-		helper_nodes.erase(h)
+	for r in MAX_CREW:
+		var key := "%s%d" % [h, r]
+		if helper_nodes.has(key):
+			(helper_nodes[key]["node"] as Node3D).queue_free()
+			helper_nodes.erase(key)
 	refresh_helpers()
 	play("build")
 	build_skins_panel()
@@ -3007,7 +3250,7 @@ func save_game() -> void:
 	var d := {"coins": coins, "xp": xp, "level": level, "inv": inv, "plots": plots, "stations": stations,
 		"animals": animals, "upg": upg, "sel": sel_crop, "help": seen_help, "muted": muted,
 		"land": land, "orders": orders, "streak": streak, "stats": stats, "claimed": claimed,
-		"skins": skins, "orchard": orchard, "trees": trees, "stars": stars}
+		"skins": skins, "orchard": orchard, "trees": trees, "stars": stars, "loc": loc, "crew": crew}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
 		f.store_string(JSON.stringify(d))
@@ -3083,6 +3326,11 @@ func load_game() -> void:
 		if HELPER_COLORS.has(k):
 			skins[k] = clampi(int(sk[k]), 0, SKIN_COLORS.size() - 1)
 	stars = int(d.get("stars", 0))
+	loc = str(d.get("loc", "farm"))
+	var cw: Dictionary = d.get("crew", {})
+	for k in cw:
+		if HELPER_COLORS.has(k):
+			crew[k] = clampi(int(cw[k]), 1, MAX_CREW)
 	orchard = bool(d.get("orchard", false))
 	var tr: Array = d.get("trees", [])
 	for k in mini(tr.size(), trees.size()):
