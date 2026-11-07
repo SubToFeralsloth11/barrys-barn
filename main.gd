@@ -151,6 +151,8 @@ var orders_box: VBoxContainer
 var orders_btn: Button
 var order_btns := []
 var build_btn: Button
+var swap_plot := -1
+var ui_hint: Label
 
 
 func _ready() -> void:
@@ -161,6 +163,7 @@ func _ready() -> void:
 	build_sounds()
 	build_world()
 	build_ui()
+	get_tree().process_frame.connect(poll_pause_key)
 	for i in plots.size():
 		spawn_plot_node(i)
 		refresh_plot(i)
@@ -905,6 +908,18 @@ func tap_plot(i: int) -> void:
 		plant(i)
 	elif ripe(p):
 		harvest_plot(i)
+	elif p["crop"] != sel_crop:
+		# a different seed is picked: second tap digs up the growing crop and plants the new one
+		if swap_plot != i:
+			swap_plot = i
+			toast("Tap again to dig up the %s and plant %s" % [item_name(p["crop"]), item_name(sel_crop)])
+			bounce(plot_nodes[i]["root"])
+			return
+		swap_plot = -1
+		p["crop"] = ""
+		refresh_plot(i)
+		plant(i)
+		bounce(plot_nodes[i]["root"])
 	else:
 		toast("%s ready in %ds" % [item_name(p["crop"]), ceili((CROPS[p["crop"]]["t"] - p["t"]) / grow_mult())])
 
@@ -928,7 +943,7 @@ func harvest_plot(i: int) -> void:
 	p["gold"] = false
 	refresh_plot(i)
 	bounce(plot_nodes[i]["root"])
-	plant(i, true, crop)
+	plant(i, true)
 	refresh_ui()
 
 
@@ -1745,10 +1760,36 @@ func _process(delta: float) -> void:
 		ui_timer = 0.25
 		for id in STATION_ORDER:
 			refresh_station(id)
+		ui_hint.text = hint_text()
 	save_timer -= delta
 	if save_timer <= 0:
 		save_timer = 5.0
 		save_game()
+
+
+## Called from SceneTree.process_frame so Esc still works while the game is paused.
+func poll_pause_key() -> void:
+	if Input.is_action_just_pressed("ui_cancel") and not help_panel.visible:
+		set_paused(not pause_panel.visible)
+
+
+## One line telling the player what they can do right now.
+func hint_text() -> String:
+	if build_mode:
+		return "BUILD MODE: tap a + to buy a plot, or tap a plot then a + to move it. Tap Done when finished."
+	for c in cars:
+		if not c["leaving"] and have(c["want"]) >= c["qty"]:
+			return "A car wants %d %s and you have it: tap the car to sell!" % [c["qty"], item_name(c["want"])]
+	for p in plots:
+		if ripe(p):
+			return "Bouncing crops are ripe: tap them to harvest. They replant with your picked seed (%s)." % item_name(sel_crop)
+	for p in plots:
+		if p["crop"] == "":
+			return "Seed picked: %s. Tap an empty plot to plant it." % item_name(sel_crop)
+	for p in plots:
+		if p["crop"] != sel_crop:
+			return "Seed picked: %s. Tap a growing crop twice to swap it, or harvest it and %s goes in." % [item_name(sel_crop), item_name(sel_crop)]
+	return "Seed picked: %s. Pick a different seed on the right to grow something else." % item_name(sel_crop)
 
 
 func _unhandled_input(e: InputEvent) -> void:
@@ -1888,7 +1929,7 @@ func build_ui() -> void:
 	var hb := big_button(" ? ")
 	hb.pressed.connect(func(): show_help(0))
 	tr.add_child(hb)
-	var pb := big_button(" II ")
+	var pb := big_button(" Pause ")
 	pb.pressed.connect(set_paused.bind(true))
 	tr.add_child(pb)
 
@@ -1928,6 +1969,20 @@ func build_ui() -> void:
 	ui_toast.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui_toast.modulate.a = 0.0
 	root.add_child(ui_toast)
+
+	var hint_panel := PanelContainer.new()
+	hint_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	hint_panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	hint_panel.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	hint_panel.offset_bottom = -12
+	hint_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(hint_panel)
+	ui_hint = Label.new()
+	ui_hint.add_theme_font_size_override("font_size", 22)
+	ui_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	ui_hint.custom_minimum_size = Vector2(760, 0)
+	ui_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint_panel.add_child(ui_hint)
 
 	upg_panel = center_panel(root)
 	upg_box = VBoxContainer.new()
@@ -2007,14 +2062,14 @@ func help_pages() -> Array:
 		recipes.append("- %s (Lv %d): %s makes %s" % [st["n"], st["lvl"], recipe_text(st["in"]), item_name(st["out"])])
 	return [
 		["Welcome to Barry's Barn!", "Barry's farm stand sits next to a busy road. Grow crops, raise animals, cook tasty goods and sell them to the cars that stop by.\n\nEarn money to buy more plots, animals, stations and helpers. Selling also earns XP, and every new level unlocks something new.\n\nTap Next for a quick tour. You can open this again with the ? button."],
-		["Crops", "1. Pick a seed on the right side of the screen.\n2. Tap an empty plot to plant it.\n3. Crops sprout, grow leaves, then fruit. When a crop starts bouncing it is ripe: tap it to harvest 2.\n\nHarvested plots replant the same seed by themselves. Wheat seeds are free, so you can never get stuck.\n\nLucky plants turn GOLDEN when ripe: double crops plus bonus cash!"],
+		["Crops", "1. Pick a seed on the right side of the screen (it turns orange).\n2. Tap an empty plot to plant it.\n3. When a crop starts bouncing it is ripe: tap it to harvest 2.\n\nAfter harvesting, the plot replants with the seed you have picked. To switch a growing crop, pick a new seed and tap that crop twice.\n\nThe bar at the bottom always tells you what to do next. Lucky plants turn GOLDEN: double crops plus bonus cash!"],
 		["Building & Expanding", "Tap Build to edit your field. Glowing + spots are free ground:\n\n- Tap a + spot to buy a new plot right there.\n- Tap a plot, then a + spot, to move it (its crop comes along).\n\nOut of room? Tap the Expand Farm sign next to your field to buy more land. Bigger farms unlock at levels 3, 5 and 8. Tap Done when you're finished."],
 		["Animals", "Chickens lay eggs, cows give milk (level 3) and pigs give bacon (level 5).\n\nWhen an egg, milk bucket or bacon floats above an animal, tap the animal to collect it.\n\nBuy more animals from the signs in front of the pen."],
 		["Kitchen Stations", "Stations turn raw items into goods that sell for much more. Tap an empty pad to build one, then tap it to start cooking. It keeps cooking by itself while you have ingredients. Tap it when it says READY to collect.\n\n" + "\n".join(recipes)],
 		["Selling", "Cars line up at the farm stand. Each shows what it wants, the price, and how long it will wait.\n\nTap a car to sell. If you don't have what it wants, keep farming: it will wait a while, and new cars ask for things you already have more often."],
 		["Orders & Streaks", "The Orders board has big deliveries that pay much more than cars. Deliver one and a new order arrives. Don't like one? Skip it.\n\nSell to cars back to back to build a sale streak: each car in a row pays 5% more, up to +50%. Let a car leave unhappy and the streak resets!"],
 		["Helpers (automation)", "Tired of tapping? Hire helpers in the Upgrades menu. They show up on the farm and keep working while you play:\n\n- Scarecrow Farmhand: harvests ripe crops\n- Barn Robot: collects eggs, milk and bacon\n- Kitchen Helper: collects and restarts stations\n- Stand Clerk: sells to cars when you have their order\n\nEach helper can be upgraded twice to work faster. With all four, your farm runs itself."],
-		["Controls & Tips", "- Tap: plant, harvest, collect, build, sell\n- Drag: move the camera\n- + / - buttons (or mouse wheel / pinch): zoom\n- II button: pause, sound, restart\n\nTips: build the Mill early, since flour sells for nearly 4x wheat. Hire the Stand Clerk first so cars never leave unhappy. The game saves by itself."],
+		["Controls & Tips", "- Tap: plant, harvest, collect, build, sell\n- Drag: move the camera\n- + / - buttons (or mouse wheel / pinch): zoom\n- Pause button (or Esc key): pause, sound, restart\n\nTips: build the Mill early, since flour sells for nearly 4x wheat. Hire the Stand Clerk first so cars never leave unhappy. The game saves by itself."],
 	]
 
 
