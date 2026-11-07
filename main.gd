@@ -140,6 +140,9 @@ var upg_box: VBoxContainer
 var help_panel: PanelContainer
 var toast_tween: Tween
 var build_mode := false
+## Assign mode: tapping a plot tells the farmhand which crop to plant there (players still plant their selected seed).
+var assign_mode := false
+var assign_btn: Button
 var move_sel := -1
 var field_root: Node3D
 var ghost_root: Node3D
@@ -726,8 +729,9 @@ func spawn_plot_node(i: int) -> void:
 	bake(base)
 	var lbl := label3d(root, "", Vector3(0, 1.8, 0), 40)
 	lbl.modulate = Color(1, 0.9, 0.4)
+	var albl := label3d(root, "", Vector3(0, 0.6, 1.25), 30)
 	add_hit(root, Vector3(2.4, 1.6, 2.4), Vector3(0, 0.8, 0), "plot", i)
-	plot_nodes.append({"root": root, "label": lbl, "crop": null, "stage": -1})
+	plot_nodes.append({"root": root, "label": lbl, "assign": albl, "crop": null, "stage": -1})
 
 
 func refresh_plot(i: int) -> void:
@@ -741,6 +745,12 @@ func refresh_plot(i: int) -> void:
 	var lbl: Label3D = pn["label"]
 	lbl.visible = move_sel == i
 	lbl.text = "Moving!\nTap a + spot"
+	var albl: Label3D = pn["assign"]
+	var a := str(p.get("assign", ""))
+	albl.visible = a != ""
+	if a != "":
+		albl.text = "Robot: " + item_name(a)
+		albl.modulate = ITEMS[a]["c"].lightened(0.3)
 	if p["crop"] != "":
 		pn["stage"] = crop_stage(p)
 		pn["crop"] = make_crop(p["crop"], pn["stage"], p["gold"], pn["root"], i)
@@ -904,6 +914,14 @@ func tap_plot(i: int) -> void:
 		bounce(plot_nodes[i]["root"])
 		play("pop")
 		return
+	if assign_mode:
+		var a := "" if p.get("assign", "") == sel_crop else sel_crop
+		p["assign"] = a
+		refresh_plot(i)
+		bounce(plot_nodes[i]["root"])
+		play("pop")
+		toast("Farmhand will plant %s here" % item_name(a) if a != "" else "Plot unassigned")
+		return
 	if p["crop"] == "":
 		plant(i)
 	elif ripe(p):
@@ -924,7 +942,7 @@ func tap_plot(i: int) -> void:
 		toast("%s ready in %ds" % [item_name(p["crop"]), ceili((CROPS[p["crop"]]["t"] - p["t"]) / grow_mult())])
 
 
-func harvest_plot(i: int) -> void:
+func harvest_plot(i: int, replant := "") -> void:
 	var p: Dictionary = plots[i]
 	var pos := plot_pos(i)
 	var crop: String = p["crop"]
@@ -943,7 +961,7 @@ func harvest_plot(i: int) -> void:
 	p["gold"] = false
 	refresh_plot(i)
 	bounce(plot_nodes[i]["root"])
-	plant(i, true)
+	plant(i, true, replant)
 	refresh_ui()
 
 
@@ -1007,6 +1025,8 @@ func tap_field(at: Vector3) -> void:
 
 func toggle_build() -> void:
 	build_mode = not build_mode
+	if build_mode and assign_mode:
+		toggle_assign()
 	var old := move_sel
 	move_sel = -1
 	if old >= 0:
@@ -1017,6 +1037,31 @@ func toggle_build() -> void:
 	if build_mode:
 		toast("Tap a + spot to buy a plot ($%d)\nTap a plot, then a + spot, to move it" % plot_cost(), 4.0)
 	play("pop")
+
+
+func toggle_assign() -> void:
+	assign_mode = not assign_mode
+	if assign_mode and build_mode:
+		toggle_build()
+	assign_btn.modulate = Color(0.6, 1, 0.7) if assign_mode else Color.WHITE
+	if assign_mode:
+		toast("Pick a seed, then tap plots to assign it to the farmhand\nTap again to clear", 4.0)
+	play("pop")
+
+
+## Harvests every ripe plot and replants each with the selected seed (empty plots get planted too).
+func harvest_all() -> void:
+	var n := 0
+	for i in plots.size():
+		if ripe(plots[i]):
+			harvest_plot(i)
+			n += 1
+		elif plots[i]["crop"] == "":
+			plant(i, true)
+			n += 1
+	if n == 0:
+		toast("Nothing ripe yet")
+		play("nope")
 
 
 ## Shows a + marker on every free cell while building.
@@ -1775,6 +1820,8 @@ func poll_pause_key() -> void:
 
 ## One line telling the player what they can do right now.
 func hint_text() -> String:
+	if assign_mode:
+		return "ASSIGN MODE: pick a seed on the right, then tap plots. The farmhand only plants that crop there. Tap Robot when finished."
 	if build_mode:
 		return "BUILD MODE: tap a + to buy a plot, or tap a plot then a + to move it. Tap Done when finished."
 	for c in cars:
@@ -1949,6 +1996,14 @@ func build_ui() -> void:
 	orders_btn.pressed.connect(func(): build_orders_panel(); orders_panel.visible = not orders_panel.visible; upg_panel.visible = false)
 	tr.add_child(orders_btn)
 	tr.move_child(orders_btn, 3)
+	assign_btn = big_button("Robot")
+	assign_btn.pressed.connect(toggle_assign)
+	tr.add_child(assign_btn)
+	tr.move_child(assign_btn, 3)
+	var harvest_btn := big_button("Harvest All")
+	harvest_btn.pressed.connect(harvest_all)
+	tr.add_child(harvest_btn)
+	tr.move_child(harvest_btn, 4)
 
 	seed_box = VBoxContainer.new()
 	seed_box.set_anchors_and_offsets_preset(Control.PRESET_CENTER_RIGHT)
@@ -2130,9 +2185,15 @@ func update_helpers(delta: float) -> void:
 		helper_timers[h] = HELPER_INTERVAL[lv]
 		match h:
 			"farmhand":
+				# ripe first, then empty plots that have a crop assigned
 				for i in plots.size():
+					var a := str(plots[i].get("assign", ""))
 					if ripe(plots[i]):
-						harvest_plot(i)
+						harvest_plot(i, a)
+						send_helper(h, plot_pos(i) + Vector3(0, 0, 1.3))
+						break
+					if plots[i]["crop"] == "" and a != "" and coins >= CROPS[a]["seed"]:
+						plant(i, true, a)
 						send_helper(h, plot_pos(i) + Vector3(0, 0, 1.3))
 						break
 			"collector":
@@ -2435,6 +2496,9 @@ func load_game() -> void:
 			if not CROPS.has(crop):
 				crop = ""
 			var e := {"crop": crop, "t": float(p.get("t", 0.0)), "gold": bool(p.get("gold", false))}
+			var asg := str(p.get("assign", ""))
+			if CROPS.has(asg):
+				e["assign"] = asg
 			if p.has("x"):
 				e["x"] = int(p["x"])
 				e["z"] = int(p["z"])
