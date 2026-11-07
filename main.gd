@@ -5,27 +5,32 @@ extends Node3D
 const ITEMS := {
 	"wheat": {"n": "Wheat", "p": 3, "c": Color(0.95, 0.8, 0.3)},
 	"carrot": {"n": "Carrot", "p": 6, "c": Color(1.0, 0.5, 0.1)},
+	"strawberry": {"n": "Strawberry", "p": 8, "c": Color(0.95, 0.2, 0.25)},
 	"corn": {"n": "Corn", "p": 10, "c": Color(1.0, 0.88, 0.2)},
 	"pumpkin": {"n": "Pumpkin", "p": 18, "c": Color(1.0, 0.45, 0.05)},
+	"sunflower": {"n": "Sunflower", "p": 30, "c": Color(1.0, 0.85, 0.1)},
 	"egg": {"n": "Egg", "p": 6, "c": Color(1.0, 0.96, 0.88)},
 	"milk": {"n": "Milk", "p": 12, "c": Color(0.96, 0.97, 1.0)},
 	"bacon": {"n": "Bacon", "p": 24, "c": Color(0.85, 0.35, 0.3)},
 	"flour": {"n": "Flour", "p": 11, "c": Color(0.98, 0.95, 0.85)},
 	"juice": {"n": "Carrot Juice", "p": 20, "c": Color(1.0, 0.6, 0.2)},
+	"jam": {"n": "Strawberry Jam", "p": 42, "c": Color(0.9, 0.2, 0.35)},
 	"cheese": {"n": "Cheese", "p": 34, "c": Color(1.0, 0.85, 0.3)},
 	"bread": {"n": "Bread", "p": 28, "c": Color(0.85, 0.6, 0.35)},
 	"popcorn": {"n": "Popcorn", "p": 32, "c": Color(1.0, 0.98, 0.8)},
 	"pie": {"n": "Pumpkin Pie", "p": 85, "c": Color(0.95, 0.55, 0.2)},
 }
-const ITEM_ORDER := ["wheat", "carrot", "corn", "pumpkin", "egg", "milk", "bacon", "flour", "juice", "cheese", "bread", "popcorn", "pie"]
-const CROP_ORDER := ["wheat", "carrot", "corn", "pumpkin"]
+const ITEM_ORDER := ["wheat", "carrot", "strawberry", "corn", "pumpkin", "sunflower", "egg", "milk", "bacon", "flour", "juice", "jam", "cheese", "bread", "popcorn", "pie"]
+const CROP_ORDER := ["wheat", "carrot", "strawberry", "corn", "pumpkin", "sunflower"]
 const CROPS := {
 	"wheat": {"t": 8.0, "lvl": 1, "seed": 0},
 	"carrot": {"t": 14.0, "lvl": 2, "seed": 2},
+	"strawberry": {"t": 18.0, "lvl": 3, "seed": 3},
 	"corn": {"t": 22.0, "lvl": 4, "seed": 4},
 	"pumpkin": {"t": 35.0, "lvl": 6, "seed": 7},
+	"sunflower": {"t": 45.0, "lvl": 8, "seed": 12},
 }
-const STATION_ORDER := ["mill", "juicer", "dairy", "bakery", "popper", "oven"]
+const STATION_ORDER := ["mill", "juicer", "dairy", "bakery", "popper", "oven", "jam"]
 const STATIONS := {
 	"mill": {"n": "Mill", "in": {"wheat": 2}, "out": "flour", "t": 6.0, "cost": 40, "lvl": 1, "c": Color(0.85, 0.75, 0.55)},
 	"juicer": {"n": "Juicer", "in": {"carrot": 2}, "out": "juice", "t": 8.0, "cost": 120, "lvl": 2, "c": Color(1.0, 0.65, 0.3)},
@@ -33,6 +38,7 @@ const STATIONS := {
 	"bakery": {"n": "Bakery", "in": {"flour": 1, "egg": 1}, "out": "bread", "t": 10.0, "cost": 300, "lvl": 4, "c": Color(0.95, 0.8, 0.6)},
 	"popper": {"n": "Popcorn Pot", "in": {"corn": 2}, "out": "popcorn", "t": 8.0, "cost": 380, "lvl": 5, "c": Color(1.0, 0.95, 0.5)},
 	"oven": {"n": "Pie Oven", "in": {"pumpkin": 1, "flour": 1, "egg": 1}, "out": "pie", "t": 16.0, "cost": 800, "lvl": 7, "c": Color(0.8, 0.45, 0.35)},
+	"jam": {"n": "Jam Pot", "in": {"strawberry": 3}, "out": "jam", "t": 12.0, "cost": 260, "lvl": 3, "c": Color(0.95, 0.5, 0.6)},
 }
 const ANIMAL_ORDER := ["chicken", "cow", "pig"]
 ## h = height the ready product floats at, spd = walk speed.
@@ -56,7 +62,16 @@ const HELPERS := ["farmhand", "collector", "chef", "seller"]
 ## Seconds between helper actions for upgrade levels 0..3 (0 = not hired).
 const HELPER_INTERVAL := [0.0, 5.0, 2.5, 1.0]
 const SAVE_PATH := "user://barrys_barn.json"
-const PLOT_COUNT := 16
+## Plots snap to a grid of CELL-sized squares; LAND[n] is the buildable area after n expansions.
+const CELL := 2.6
+const FIELD_ORIGIN := Vector2(-14.0, -6.5)
+const LAND := [Rect2i(0, 0, 4, 4), Rect2i(-2, -1, 6, 6), Rect2i(-4, -1, 8, 6), Rect2i(-6, -1, 10, 7)]
+const LAND_COST := [0, 250, 900, 2500]
+const LAND_LVL := [1, 3, 5, 8]
+const GOLD_CHANCE := 0.08
+const ORDER_SLOTS := 3
+const GOLD := Color(1.0, 0.8, 0.15)
+const LEAF := Color(0.28, 0.62, 0.22)
 const STAND_X := 6.0
 const LANE_Z := 10.2
 const PEN_MIN := Vector2(0.8, -9.4)
@@ -89,6 +104,9 @@ var reset_btn: Button
 var mute_btn: Button
 var sel_crop := "wheat"
 var seen_help := false
+var land := 0
+var orders := []
+var streak := 0
 
 # --- runtime ---
 var mats := {}
@@ -121,17 +139,32 @@ var upg_panel: PanelContainer
 var upg_box: VBoxContainer
 var help_panel: PanelContainer
 var toast_tween: Tween
+var build_mode := false
+var move_sel := -1
+var field_root: Node3D
+var ghost_root: Node3D
+var ghost_mat: StandardMaterial3D
+var sale_label: Label3D
+var ui_streak: Label
+var orders_panel: PanelContainer
+var orders_box: VBoxContainer
+var orders_btn: Button
+var order_btns := []
+var build_btn: Button
 
 
 func _ready() -> void:
 	randomize()
 	new_game_state()
 	load_game()
+	fill_orders()
 	build_sounds()
 	build_world()
 	build_ui()
-	for i in PLOT_COUNT:
+	for i in plots.size():
+		spawn_plot_node(i)
 		refresh_plot(i)
+	refresh_field()
 	for id in STATION_ORDER:
 		refresh_station(id)
 	for i in animals.size():
@@ -145,8 +178,8 @@ func _ready() -> void:
 
 func new_game_state() -> void:
 	plots.clear()
-	for i in PLOT_COUNT:
-		plots.append({"open": i < 4, "crop": "", "t": 0.0})
+	for i in 4:
+		plots.append({"x": i, "z": 0, "crop": "", "t": 0.0, "gold": false})
 	for id in STATION_ORDER:
 		stations[id] = {"own": false, "busy": false, "t": 0.0, "ready": 0}
 	animals = [{"type": "chicken", "t": 0.0}]
@@ -193,12 +226,12 @@ func cyl(parent: Node, r_top: float, r_bot: float, h: float, pos: Vector3, c: Co
 	return add_mesh(parent, cm, pos, c)
 
 
-func sph(parent: Node, r: float, pos: Vector3, c: Color, sc := Vector3.ONE) -> MeshInstance3D:
+func sph(parent: Node, r: float, pos: Vector3, c: Color, sc := Vector3.ONE, seg := 16) -> MeshInstance3D:
 	var sm := SphereMesh.new()
 	sm.radius = r
 	sm.height = r * 2.0
-	sm.radial_segments = 16
-	sm.rings = 8
+	sm.radial_segments = seg
+	sm.rings = seg / 2
 	var mi := add_mesh(parent, sm, pos, c)
 	mi.scale = sc
 	return mi
@@ -253,6 +286,64 @@ func node_at(parent: Node, pos: Vector3) -> Node3D:
 	n.position = pos
 	parent.add_child(n)
 	return n
+
+
+## Marks a mesh as fruit so golden crops can re-skin it.
+func fr(mi: MeshInstance3D) -> MeshInstance3D:
+	mi.set_meta("fruit", true)
+	return mi
+
+
+## A flat leaf starting at pos, pointing along yaw and tilted up by tilt radians.
+func leaf(parent: Node3D, pos: Vector3, length: float, yaw: float, tilt: float, c: Color) -> void:
+	var piv := node_at(parent, pos)
+	piv.rotation = Vector3(-tilt, yaw, 0)
+	sph(piv, length * 0.5, Vector3(0, 0, length * 0.5), c, Vector3(0.4, 0.12, 1.0), 8)
+
+
+## Merges every mesh under n into one mesh (one surface per material) so detailed models stay cheap to draw.
+func bake(n: Node3D) -> void:
+	var groups := {}
+	bake_walk(n, Transform3D.IDENTITY, groups)
+	for ch in n.get_children():
+		n.remove_child(ch)
+		ch.queue_free()
+	var am := ArrayMesh.new()
+	for m in groups:
+		var arrays := []
+		arrays.resize(Mesh.ARRAY_MAX)
+		arrays[Mesh.ARRAY_VERTEX] = groups[m][0]
+		arrays[Mesh.ARRAY_NORMAL] = groups[m][1]
+		arrays[Mesh.ARRAY_INDEX] = groups[m][2]
+		am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+		am.surface_set_material(am.get_surface_count() - 1, m)
+	var mi := MeshInstance3D.new()
+	mi.mesh = am
+	n.add_child(mi)
+
+
+func bake_walk(node: Node, xf: Transform3D, groups: Dictionary) -> void:
+	for ch in node.get_children():
+		if not ch is Node3D:
+			continue
+		var cxf: Transform3D = xf * (ch as Node3D).transform
+		if ch is MeshInstance3D:
+			var mi := ch as MeshInstance3D
+			var arr: Array = mi.mesh.surface_get_arrays(0)
+			var g: Array = groups.get(mi.material_override, [PackedVector3Array(), PackedVector3Array(), PackedInt32Array()])
+			var verts: PackedVector3Array = g[0]
+			var norms: PackedVector3Array = g[1]
+			var idx: PackedInt32Array = g[2]
+			var base := verts.size()
+			var nb := cxf.basis.inverse().transposed()
+			for v in arr[Mesh.ARRAY_VERTEX]:
+				verts.append(cxf * v)
+			for nv in arr[Mesh.ARRAY_NORMAL]:
+				norms.append((nb * nv).normalized())
+			for k in arr[Mesh.ARRAY_INDEX]:
+				idx.append(base + k)
+			groups[mi.material_override] = [verts, norms, idx]
+		bake_walk(ch, cxf, groups)
 
 
 func bounce(n: Node3D) -> void:
@@ -375,13 +466,15 @@ func build_world() -> void:
 	build_pen()
 	build_decor()
 
-	# plots
-	for i in PLOT_COUNT:
-		var root := node_at(self, plot_pos(i))
-		var dirt := box(root, Vector3(2.2, 0.25, 2.2), Vector3(0, 0.12, 0), DIRT)
-		var lbl := label3d(root, "", Vector3(0, 1.0, 0), 40)
-		add_hit(root, Vector3(2.4, 1.6, 2.4), Vector3(0, 0.8, 0), "plot", i)
-		plot_nodes.append({"root": root, "dirt": dirt, "label": lbl, "crop": null})
+	# one tap target covers the biggest farm; plots and build ghosts sit on top of it
+	field_root = node_at(self, Vector3.ZERO)
+	ghost_root = node_at(self, Vector3.ZERO)
+	ghost_mat = StandardMaterial3D.new()
+	ghost_mat.albedo_color = Color(0.6, 1.0, 0.5, 0.45)
+	ghost_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	ghost_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	var fb := land_bounds(LAND[LAND.size() - 1])
+	add_hit(self, Vector3(fb.size.x, 0.1, fb.size.y), Vector3(fb.get_center().x, 0.05, fb.get_center().y), "field", 0)
 
 	# stations
 	for i in STATION_ORDER.size():
@@ -394,9 +487,6 @@ func build_world() -> void:
 		add_hit(root, Vector3(3.0, 3.0, 2.6), Vector3(0, 1.5, 0), "station", id)
 		station_nodes[id] = {"root": root, "pad": pad, "bld": bld, "label": lbl, "spin": bld.get_node_or_null("Spin")}
 
-
-func plot_pos(i: int) -> Vector3:
-	return Vector3(-14.0 + (i % 4) * 2.6, 0, -6.5 + int(i / 4.0) * 2.6)
 
 
 func station_pos(i: int) -> Vector3:
@@ -504,7 +594,7 @@ func build_decor() -> void:
 		var p := Vector3(rng.randf_range(-45, 45), 0, rng.randf_range(-35, 30))
 		if p.z > 6.0 and p.z < 16.0:
 			continue
-		if p.x > -19 and p.x < 22 and p.z > -19 and p.z < 7:
+		if p.x > -33 and p.x < 22 and p.z > -19 and p.z < 7:
 			continue
 		spots.append(p)
 	for p in spots:
@@ -522,6 +612,7 @@ func build_decor() -> void:
 			sph(t, 0.75 * s, Vector3(0.6 * s, 2.5 * s, 0.2 * s), leaf.lightened(0.08))
 			sph(t, 0.7 * s, Vector3(-0.55 * s, 2.4 * s, -0.3 * s), leaf.darkened(0.08))
 			sph(t, 0.6 * s, Vector3(0.1 * s, 2.9 * s, -0.1 * s), leaf.lightened(0.12))
+		bake(t)
 	for i in 12:
 		var x := -16.0 + i * 3.4
 		if x > -1.5 and x < 0.5:
@@ -561,132 +652,452 @@ func build_station_model(id: String, b: Node3D) -> void:
 		"oven":
 			cyl(b, 0.2, 0.2, 1.0, Vector3(0.7, 2.5, -0.3), Color(0.4, 0.3, 0.3))
 			cyl(spin, 0.3, 0.3, 0.1, Vector3.ZERO, Color(0.95, 0.55, 0.2), 10).rotation_degrees.x = 90
+		"jam":
+			cyl(spin, 0.26, 0.22, 0.36, Vector3.ZERO, Color(0.85, 0.15, 0.3), 12)
 
 
-# ================= plots =================
+# ================= field & plots =================
 
-func open_plot_count() -> int:
-	var n := 0
-	for p in plots:
-		if p["open"]:
-			n += 1
-	return n
+const SPOTS := [Vector3(-0.55, 0, -0.55), Vector3(0.55, 0, -0.55), Vector3(-0.55, 0, 0.55), Vector3(0.55, 0, 0.55), Vector3.ZERO]
+const CORNERS := [Vector3(-0.5, 0, -0.5), Vector3(0.5, 0, -0.5), Vector3(-0.5, 0, 0.5), Vector3(0.5, 0, 0.5)]
 
 
-func next_locked() -> int:
-	for i in PLOT_COUNT:
-		if not plots[i]["open"]:
+func cell_pos(gx: int, gz: int) -> Vector3:
+	return Vector3(FIELD_ORIGIN.x + gx * CELL, 0, FIELD_ORIGIN.y + gz * CELL)
+
+
+func plot_pos(i: int) -> Vector3:
+	return cell_pos(plots[i]["x"], plots[i]["z"])
+
+
+func land_rect() -> Rect2i:
+	return LAND[land]
+
+
+## World-space XZ rectangle covered by a block of cells.
+func land_bounds(r: Rect2i) -> Rect2:
+	var a := cell_pos(r.position.x, r.position.y)
+	return Rect2(a.x - CELL / 2, a.z - CELL / 2, r.size.x * CELL, r.size.y * CELL)
+
+
+func plot_at(gx: int, gz: int) -> int:
+	for i in plots.size():
+		if plots[i]["x"] == gx and plots[i]["z"] == gz:
 			return i
 	return -1
 
 
 func plot_cost() -> int:
-	return 15 + (open_plot_count() - 4) * 12
+	return 15 + (plots.size() - 4) * 12
 
 
 func grow_mult() -> float:
 	return 1.0 + 0.15 * upg["fert"]
 
 
+func ripe(p: Dictionary) -> bool:
+	return p["crop"] != "" and p["t"] >= CROPS[p["crop"]]["t"]
+
+
+## 0 sprout, 1 leafy, 2 unripe fruit, 3 ripe.
+func crop_stage(p: Dictionary) -> int:
+	var prog: float = p["t"] / CROPS[p["crop"]]["t"]
+	if prog >= 1.0:
+		return 3
+	if prog >= 0.6:
+		return 2
+	if prog >= 0.25:
+		return 1
+	return 0
+
+
+func spawn_plot_node(i: int) -> void:
+	var root := node_at(self, plot_pos(i))
+	var base := node_at(root, Vector3.ZERO)
+	box(base, Vector3(2.2, 0.22, 2.2), Vector3(0, 0.11, 0), DIRT)
+	for k in 3:
+		box(base, Vector3(1.9, 0.08, 0.34), Vector3(0, 0.25, -0.6 + k * 0.6), DIRT.darkened(0.18))
+	for s: float in [-1.0, 1.0]:
+		box(base, Vector3(2.4, 0.3, 0.12), Vector3(0, 0.15, s * 1.14), WOOD)
+		box(base, Vector3(0.12, 0.3, 2.4), Vector3(s * 1.14, 0.15, 0), WOOD)
+	bake(base)
+	var lbl := label3d(root, "", Vector3(0, 1.8, 0), 40)
+	lbl.modulate = Color(1, 0.9, 0.4)
+	add_hit(root, Vector3(2.4, 1.6, 2.4), Vector3(0, 0.8, 0), "plot", i)
+	plot_nodes.append({"root": root, "label": lbl, "crop": null, "stage": -1})
+
+
 func refresh_plot(i: int) -> void:
 	var pn: Dictionary = plot_nodes[i]
 	var p: Dictionary = plots[i]
-	(pn["dirt"] as MeshInstance3D).material_override = mat(DIRT if p["open"] else LOCKED_DIRT)
+	(pn["root"] as Node3D).position = plot_pos(i)
 	if pn["crop"] != null:
 		(pn["crop"] as Node3D).queue_free()
 		pn["crop"] = null
+	pn["stage"] = -1
 	var lbl: Label3D = pn["label"]
-	lbl.visible = not p["open"] and i == next_locked()
-	lbl.text = "Buy Plot\n$%d" % plot_cost()
+	lbl.visible = move_sel == i
+	lbl.text = "Moving!\nTap a + spot"
 	if p["crop"] != "":
-		pn["crop"] = make_crop(p["crop"], pn["root"])
+		pn["stage"] = crop_stage(p)
+		pn["crop"] = make_crop(p["crop"], pn["stage"], p["gold"], pn["root"], i)
 
 
-func make_crop(type: String, parent: Node3D) -> Node3D:
-	var c := node_at(parent, Vector3(0, 0.25, 0))
-	var offs := [Vector3(-0.55, 0, -0.55), Vector3(0.55, 0, -0.55), Vector3(-0.55, 0, 0.55), Vector3(0.55, 0, 0.55), Vector3.ZERO]
-	for o in offs:
+func make_crop(type: String, stage: int, gold: bool, parent: Node3D, seed_i: int) -> Node3D:
+	var c := node_at(parent, Vector3(0, 0.22, 0))
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_i * 7919 + 13
+	if stage == 0:
+		for o: Vector3 in SPOTS:
+			var yaw := rng.randf() * TAU
+			leaf(c, o, 0.22, yaw, 0.6, LEAF.lightened(0.15))
+			leaf(c, o, 0.22, yaw + PI, 0.6, LEAF.lightened(0.15))
+	else:
 		match type:
 			"wheat":
-				for k in 3:
-					var d := Vector3((k - 1) * 0.12, 0, (k % 2) * 0.1)
-					cyl(c, 0.02, 0.03, 0.8, o + d + Vector3(0, 0.4, 0), Color(0.75, 0.7, 0.3), 4)
-					cyl(c, 0.05, 0.06, 0.3, o + d + Vector3(0, 0.9, 0), Color(0.95, 0.8, 0.3), 5)
+				grow_wheat(c, stage, rng)
 			"carrot":
-				cyl(c, 0.14, 0.0, 0.4, o + Vector3(0, 0.05, 0), Color(1, 0.5, 0.1), 6)
-				for k in 3:
-					cyl(c, 0.0, 0.06, 0.45, o + Vector3((k - 1) * 0.08, 0.45, 0), Color(0.2, 0.7, 0.2), 4).rotation_degrees.z = (k - 1) * 20.0
+				grow_carrot(c, stage, rng)
+			"strawberry":
+				grow_strawberry(c, stage, rng)
 			"corn":
-				cyl(c, 0.05, 0.08, 1.6, o + Vector3(0, 0.8, 0), Color(0.3, 0.65, 0.25), 5)
-				sph(c, 0.12, o + Vector3(0.12, 1.0, 0), Color(1, 0.88, 0.2), Vector3(1, 2.2, 1))
-				box(c, Vector3(0.6, 0.04, 0.12), o + Vector3(0, 1.3, 0), Color(0.35, 0.7, 0.3)).rotation_degrees.y = 40
+				grow_corn(c, stage, rng)
 			"pumpkin":
-				if o == Vector3.ZERO:
-					continue
-				sph(c, 0.32, o + Vector3(0, 0.22, 0), Color(1, 0.45, 0.05), Vector3(1.2, 0.8, 1.2))
-				cyl(c, 0.04, 0.05, 0.2, o + Vector3(0, 0.5, 0), Color(0.3, 0.5, 0.2), 4)
-	c.scale = Vector3.ONE * 0.25
+				grow_pumpkin(c, stage, rng)
+			"sunflower":
+				grow_sunflower(c, stage, rng)
+	if gold and stage == 3:
+		gild(c)
+	bake(c)
 	return c
+
+
+func gild(n: Node) -> void:
+	for ch in n.get_children():
+		if ch is MeshInstance3D and ch.has_meta("fruit"):
+			skin(ch, GOLD, 0.6, true)
+		gild(ch)
+
+
+func grow_wheat(c: Node3D, s: int, rng: RandomNumberGenerator) -> void:
+	var h: float = [0.0, 0.45, 0.75, 0.95][s]
+	var stalk := LEAF.lightened(0.1) if s < 3 else Color(0.85, 0.72, 0.32)
+	var head := Color(0.6, 0.78, 0.32) if s < 3 else Color(0.98, 0.83, 0.38)
+	for o: Vector3 in SPOTS:
+		for k in 3:
+			var piv := node_at(c, o + Vector3(rng.randf_range(-0.2, 0.2), 0, rng.randf_range(-0.2, 0.2)))
+			piv.rotation = Vector3(rng.randf_range(-0.2, 0.2), 0, rng.randf_range(-0.2, 0.2))
+			var hh := h * rng.randf_range(0.85, 1.1)
+			cyl(piv, 0.015, 0.025, hh, Vector3(0, hh / 2, 0), stalk, 4)
+			if k == 0:
+				leaf(piv, Vector3(0, hh * 0.25, 0), hh * 0.6, rng.randf() * TAU, 0.7, stalk.darkened(0.1))
+			if s >= 2:
+				for j in 4:
+					fr(sph(piv, 0.04, Vector3((j % 2) * 0.04 - 0.02, hh + j * 0.06, 0), head, Vector3(1, 1.5, 1), 6))
+				if s == 3:
+					cyl(piv, 0.003, 0.006, 0.25, Vector3(0, hh + 0.3, 0), head, 3)
+
+
+func grow_carrot(c: Node3D, s: int, rng: RandomNumberGenerator) -> void:
+	var n := 2 + s
+	for o: Vector3 in SPOTS:
+		for k in n:
+			var yaw := k * TAU / n + rng.randf() * 0.5
+			var ln := (0.18 + 0.14 * s) * rng.randf_range(0.85, 1.15)
+			leaf(c, o + Vector3(0, 0.05, 0), ln, yaw, 1.05, LEAF)
+			leaf(c, o + Vector3(sin(yaw), 0, cos(yaw)) * ln * 0.3 + Vector3(0, ln * 0.6, 0), ln * 0.55, yaw, 0.5, LEAF.lightened(0.1))
+		if s >= 2:
+			var r := 0.09 if s == 2 else 0.14
+			fr(cyl(c, r, r * 0.7, 0.14, o + Vector3(0, 0.04, 0), Color(1, 0.5, 0.1), 10))
+			if s == 3:
+				fr(sph(c, r, o + Vector3(0, 0.11, 0), Color(1, 0.55, 0.12), Vector3(1, 0.35, 1), 10))
+
+
+func grow_strawberry(c: Node3D, s: int, rng: RandomNumberGenerator) -> void:
+	for o: Vector3 in SPOTS:
+		var n := 3 + s
+		for k in n:
+			var a := k * TAU / n + rng.randf() * 0.4
+			leaf(c, o + Vector3(0, 0.04, 0), 0.16 + 0.04 * s, a, 0.45, LEAF.darkened(0.05 + rng.randf() * 0.1))
+		if s == 2:
+			for k in 2:
+				var p := o + Vector3(rng.randf_range(-0.15, 0.15), 0.2, rng.randf_range(-0.15, 0.15))
+				sph(c, 0.05, p, Color.WHITE, Vector3(1, 0.4, 1), 8)
+				sph(c, 0.022, p + Vector3(0, 0.02, 0), Color(1, 0.85, 0.2), Vector3.ONE, 6)
+		elif s == 3:
+			for k in 3:
+				var a := k * TAU / 3 + rng.randf()
+				var p := o + Vector3(cos(a) * 0.2, 0.08, sin(a) * 0.2)
+				fr(sph(c, 0.07, p, Color(0.92, 0.12, 0.18), Vector3(1, 1.25, 1), 10))
+				sph(c, 0.045, p + Vector3(0, 0.08, 0), LEAF, Vector3(1, 0.35, 1), 6)
+
+
+func grow_corn(c: Node3D, s: int, rng: RandomNumberGenerator) -> void:
+	var h: float = [0.0, 0.6, 1.15, 1.6][s]
+	for o: Vector3 in SPOTS:
+		var piv := node_at(c, o + Vector3(rng.randf_range(-0.1, 0.1), 0, rng.randf_range(-0.1, 0.1)))
+		piv.rotation.y = rng.randf() * TAU
+		cyl(piv, 0.035, 0.065, h, Vector3(0, h / 2, 0), LEAF.darkened(0.05), 6)
+		for k in 2 + s:
+			leaf(piv, Vector3(0, h * (0.15 + 0.2 * k), 0), 0.35 + 0.08 * s, k * 2.4, 0.3 - 0.05 * k, LEAF.lightened(0.05 * (k % 2)))
+		if s >= 2:
+			var cob := node_at(piv, Vector3(0.07, h * 0.5, 0))
+			cob.rotation.z = -0.35
+			var r := 0.08 if s == 2 else 0.1
+			fr(sph(cob, r, Vector3(0, r * 1.6, 0), Color(1, 0.85, 0.25) if s == 3 else Color(0.8, 0.85, 0.45), Vector3(1, 2.0, 1), 10))
+			sph(cob, r * 1.15, Vector3(0, r * 0.8, 0), Color(0.55, 0.78, 0.35), Vector3(1, 1.8, 1), 8)
+		if s == 3:
+			for k in 4:
+				var t := node_at(piv, Vector3(0, h, 0))
+				t.rotation = Vector3(0.4, k * PI / 2, 0)
+				cyl(t, 0.008, 0.014, 0.28, Vector3(0, 0.14, 0), Color(0.85, 0.7, 0.35), 4)
+
+
+func grow_pumpkin(c: Node3D, s: int, rng: RandomNumberGenerator) -> void:
+	for k in 4 + s * 2:
+		var p := Vector3(rng.randf_range(-0.85, 0.85), 0.04, rng.randf_range(-0.85, 0.85))
+		sph(c, 0.16 + 0.03 * s, p + Vector3(0, 0.03 * s, 0), LEAF.darkened(rng.randf() * 0.15), Vector3(1, 0.3, 1), 10)
+		cyl(c, 0.02, 0.02, 0.5, p, LEAF.darkened(0.2), 4).rotation = Vector3(PI / 2, rng.randf() * TAU, 0)
+	if s < 2:
+		return
+	var r := 0.18 if s == 2 else 0.34
+	var col := Color(0.55, 0.72, 0.28) if s == 2 else Color(1, 0.5, 0.08)
+	for o: Vector3 in [Vector3(-0.42, 0, -0.38), Vector3(0.45, 0, 0.42)]:
+		fr(sph(c, r, o + Vector3(0, r * 0.75, 0), col.darkened(0.08), Vector3(1.15, 0.8, 1.15), 12))
+		for k in 6:
+			var a := k * TAU / 6 + 0.3
+			fr(sph(c, r * 0.55, o + Vector3(cos(a) * r * 0.62, r * 0.75, sin(a) * r * 0.62), col, Vector3(1, 1.35, 1), 10))
+		cyl(c, 0.03, 0.045, 0.16, o + Vector3(0, r * 1.45, 0), Color(0.4, 0.45, 0.2), 6)
+
+
+func grow_sunflower(c: Node3D, s: int, rng: RandomNumberGenerator) -> void:
+	var h: float = [0.0, 0.55, 1.1, 1.5][s]
+	for o: Vector3 in CORNERS:
+		var piv := node_at(c, o)
+		piv.rotation.z = rng.randf_range(-0.08, 0.08)
+		cyl(piv, 0.035, 0.05, h, Vector3(0, h / 2, 0), LEAF.darkened(0.1), 6)
+		for k in 1 + s:
+			leaf(piv, Vector3(0, h * (0.25 + 0.2 * k), 0), 0.32, k * 2.5 + rng.randf(), 0.15, LEAF)
+		if s == 2:
+			sph(piv, 0.1, Vector3(0, h, 0), LEAF.darkened(0.15), Vector3(1, 0.8, 1), 8)
+		elif s == 3:
+			var head := node_at(piv, Vector3(0, h, 0))
+			head.rotation.x = 0.9
+			fr(cyl(head, 0.14, 0.14, 0.06, Vector3.ZERO, Color(0.4, 0.25, 0.1), 14))
+			for k in 12:
+				var a := k * TAU / 12
+				var pet := fr(sph(head, 0.1, Vector3(cos(a) * 0.22, 0, sin(a) * 0.22), Color(1, 0.82, 0.1), Vector3(0.45, 0.18, 1), 8))
+				pet.rotation.y = atan2(cos(a), sin(a))
 
 
 func tap_plot(i: int) -> void:
 	var p: Dictionary = plots[i]
-	var pos := plot_pos(i)
-	if not p["open"]:
-		if i != next_locked():
-			toast("Buy the glowing plot first")
-			play("nope")
-			return
-		var cost := plot_cost()
-		if coins < cost:
-			toast("Need $%d to buy this plot" % cost)
-			play("nope")
-			return
-		coins -= cost
-		p["open"] = true
-		play("build")
-		float_text(pos, "New plot!", Color(0.6, 1, 0.6))
+	if build_mode:
+		var old := move_sel
+		move_sel = -1 if old == i else i
+		if old >= 0:
+			refresh_plot(old)
 		refresh_plot(i)
-		var nl := next_locked()
-		if nl >= 0:
-			refresh_plot(nl)
 		bounce(plot_nodes[i]["root"])
-		refresh_ui()
+		play("pop")
 		return
 	if p["crop"] == "":
 		plant(i)
-		return
-	var need: float = CROPS[p["crop"]]["t"]
-	if p["t"] >= need:
-		var crop: String = p["crop"]
-		add_item(crop, 2)
-		gain_xp(1)
-		play("pop")
-		float_text(pos, "+2 " + item_name(crop), ITEMS[crop]["c"])
-		p["crop"] = ""
-		refresh_plot(i)
-		bounce(plot_nodes[i]["root"])
-		plant(i, true)
+	elif ripe(p):
+		harvest_plot(i)
 	else:
-		toast("%s ready in %ds" % [item_name(p["crop"]), ceili((need - p["t"]) / grow_mult())])
+		toast("%s ready in %ds" % [item_name(p["crop"]), ceili((CROPS[p["crop"]]["t"] - p["t"]) / grow_mult())])
 
 
-func plant(i: int, quiet := false) -> void:
+func harvest_plot(i: int) -> void:
 	var p: Dictionary = plots[i]
-	var cost: int = CROPS[sel_crop]["seed"]
+	var pos := plot_pos(i)
+	var crop: String = p["crop"]
+	var gold: bool = p["gold"]
+	add_item(crop, 4 if gold else 2)
+	gain_xp(3 if gold else 1)
+	play("pop")
+	if gold:
+		var bonus: int = ITEMS[crop]["p"] * 3
+		coins += bonus
+		play("coin")
+		float_text(pos, "GOLDEN! +4 %s +$%d" % [item_name(crop), bonus], GOLD)
+	else:
+		float_text(pos, "+2 " + item_name(crop), ITEMS[crop]["c"])
+	p["crop"] = ""
+	p["gold"] = false
+	refresh_plot(i)
+	bounce(plot_nodes[i]["root"])
+	plant(i, true, crop)
+	refresh_ui()
+
+
+func plant(i: int, quiet := false, type := "") -> void:
+	var p: Dictionary = plots[i]
+	if type == "":
+		type = sel_crop
+	var cost: int = CROPS[type]["seed"]
 	if coins < cost:
 		if not quiet:
 			toast("Seeds cost $%d" % cost)
 			play("nope")
 		return
 	coins -= cost
-	p["crop"] = sel_crop
+	p["crop"] = type
 	p["t"] = 0.0
+	p["gold"] = randf() < GOLD_CHANCE
 	refresh_plot(i)
 	if not quiet:
 		play("pop")
 	refresh_ui()
 
+
+## Build mode: tap free ground to buy a plot there, or drop the plot picked up with tap_plot.
+func tap_field(at: Vector3) -> void:
+	if not build_mode:
+		toast("Tap Build to place new plots")
+		return
+	var gx := roundi((at.x - FIELD_ORIGIN.x) / CELL)
+	var gz := roundi((at.z - FIELD_ORIGIN.y) / CELL)
+	if not land_rect().has_point(Vector2i(gx, gz)):
+		toast("Expand your farm to build out here")
+		play("nope")
+		return
+	if plot_at(gx, gz) >= 0:
+		return
+	if move_sel >= 0:
+		var i := move_sel
+		move_sel = -1
+		plots[i]["x"] = gx
+		plots[i]["z"] = gz
+		refresh_plot(i)
+		bounce(plot_nodes[i]["root"])
+		play("pop")
+		refresh_ghosts()
+		return
+	var cost := plot_cost()
+	if coins < cost:
+		toast("Need $%d for a new plot" % cost)
+		play("nope")
+		return
+	coins -= cost
+	plots.append({"x": gx, "z": gz, "crop": "", "t": 0.0, "gold": false})
+	spawn_plot_node(plots.size() - 1)
+	play("build")
+	float_text(cell_pos(gx, gz), "New plot!", Color(0.6, 1, 0.6))
+	bounce(plot_nodes[-1]["root"])
+	refresh_ghosts()
+	refresh_ui()
+
+
+func toggle_build() -> void:
+	build_mode = not build_mode
+	var old := move_sel
+	move_sel = -1
+	if old >= 0:
+		refresh_plot(old)
+	build_btn.text = " Done " if build_mode else " Build "
+	build_btn.modulate = Color(1, 0.85, 0.4) if build_mode else Color.WHITE
+	refresh_ghosts()
+	if build_mode:
+		toast("Tap a + spot to buy a plot ($%d)\nTap a plot, then a + spot, to move it" % plot_cost(), 4.0)
+	play("pop")
+
+
+## Shows a + marker on every free cell while building.
+func refresh_ghosts() -> void:
+	for ch in ghost_root.get_children():
+		ch.queue_free()
+	if not build_mode:
+		return
+	var r := land_rect()
+	for gx in range(r.position.x, r.end.x):
+		for gz in range(r.position.y, r.end.y):
+			if plot_at(gx, gz) >= 0:
+				continue
+			var g := box(ghost_root, Vector3(2.1, 0.06, 2.1), cell_pos(gx, gz) + Vector3(0, 0.08, 0), Color.WHITE)
+			g.material_override = ghost_mat
+			label3d(ghost_root, "+", cell_pos(gx, gz) + Vector3(0, 0.5, 0), 90).modulate = Color(0.7, 1, 0.6)
+
+
+## Rebuilds the field fence and the Expand Farm sign for the current land size.
+func refresh_field() -> void:
+	for ch in field_root.get_children():
+		field_root.remove_child(ch)
+		ch.queue_free()
+	var b := land_bounds(land_rect()).grow(0.25)
+	var mid := b.get_center()
+	var fence := node_at(field_root, Vector3.ZERO)
+	box(fence, Vector3(b.size.x, 0.03, b.size.y), Vector3(mid.x, 0.015, mid.y), Color(0.4, 0.56, 0.24))
+	var nx := ceili(b.size.x / 1.6)
+	var nz := ceili(b.size.y / 1.6)
+	for k in nx + 1:
+		var x := lerpf(b.position.x, b.end.x, float(k) / nx)
+		box(fence, Vector3(0.16, 0.9, 0.16), Vector3(x, 0.45, b.position.y), WOOD)
+		box(fence, Vector3(0.16, 0.9, 0.16), Vector3(x, 0.45, b.end.y), WOOD)
+	for k in range(1, nz):
+		var z := lerpf(b.position.y, b.end.y, float(k) / nz)
+		box(fence, Vector3(0.16, 0.9, 0.16), Vector3(b.position.x, 0.45, z), WOOD)
+		box(fence, Vector3(0.16, 0.9, 0.16), Vector3(b.end.x, 0.45, z), WOOD)
+	for h in [0.35, 0.7]:
+		box(fence, Vector3(b.size.x, 0.1, 0.07), Vector3(mid.x, h, b.position.y), WOOD)
+		box(fence, Vector3(b.size.x, 0.1, 0.07), Vector3(mid.x, h, b.end.y), WOOD)
+		box(fence, Vector3(0.07, 0.1, b.size.y), Vector3(b.position.x, h, mid.y), WOOD)
+		box(fence, Vector3(0.07, 0.1, b.size.y), Vector3(b.end.x, h, mid.y), WOOD)
+	bake(fence)
+	sale_label = null
+	if land >= LAND.size() - 1:
+		return
+	var nr: Rect2i = LAND[land + 1]
+	var nb := land_bounds(nr)
+	var flags := node_at(field_root, Vector3.ZERO)
+	for corner: Vector2 in [nb.position, Vector2(nb.end.x, nb.position.y), Vector2(nb.position.x, nb.end.y), nb.end]:
+		cyl(flags, 0.04, 0.04, 1.2, Vector3(corner.x, 0.6, corner.y), WOOD, 6)
+		box(flags, Vector3(0.45, 0.28, 0.03), Vector3(corner.x + 0.22, 1.05, corner.y), Color(0.95, 0.3, 0.2))
+	bake(flags)
+	var sn := node_at(field_root, cell_pos(nr.position.x, nr.position.y + nr.size.y / 2))
+	box(sn, Vector3(0.14, 1.4, 0.14), Vector3(-0.8, 0.7, 0), WOOD)
+	box(sn, Vector3(0.14, 1.4, 0.14), Vector3(0.8, 0.7, 0), WOOD)
+	box(sn, Vector3(2.3, 1.1, 0.1), Vector3(0, 1.5, 0), Color(0.95, 0.9, 0.75))
+	box(sn, Vector3(2.4, 0.12, 0.14), Vector3(0, 2.1, 0), Color(0.9, 0.2, 0.2))
+	sale_label = label3d(sn, "", Vector3(0, 1.5, 0.08), 34, false)
+	sale_label.modulate = Color(0.2, 0.12, 0.05)
+	sale_label.outline_size = 0
+	add_hit(sn, Vector3(2.4, 2.2, 1.0), Vector3(0, 1.1, 0), "expand", 0)
+	refresh_sale_sign()
+
+
+func refresh_sale_sign() -> void:
+	if sale_label == null:
+		return
+	var nxt := land + 1
+	if level < LAND_LVL[nxt]:
+		sale_label.text = "Expand Farm\nLevel %d" % LAND_LVL[nxt]
+	else:
+		sale_label.text = "Expand Farm\n$%d" % LAND_COST[nxt]
+
+
+func buy_land() -> void:
+	var nxt := land + 1
+	if nxt >= LAND.size():
+		return
+	if level < LAND_LVL[nxt]:
+		toast("More land unlocks at level %d" % LAND_LVL[nxt])
+		play("nope")
+		return
+	if coins < LAND_COST[nxt]:
+		toast("Need $%d to expand the farm" % LAND_COST[nxt])
+		play("nope")
+		return
+	coins -= LAND_COST[nxt]
+	land = nxt
+	play("level")
+	var c := land_bounds(land_rect()).get_center()
+	float_text(Vector3(c.x, 0, c.y), "Farm expanded!", Color(0.6, 1, 0.6))
+	toast("More land! Tap Build to place plots on it", 3.0)
+	refresh_field()
+	refresh_ghosts()
+	refresh_ui()
 
 # ================= stations =================
 
@@ -1066,10 +1477,16 @@ func tap_car(iid: int) -> void:
 		bounce(n.get_node("Body"))
 		return
 	inv[want] = have(want) - c["qty"]
-	coins += c["pay"]
+	var bonus := int(c["pay"] * 0.05 * mini(streak, 10))
+	var total: int = c["pay"] + bonus
+	streak += 1
+	coins += total
 	gain_xp(c["pay"])
 	play("coin")
-	float_text(n.position + Vector3(0, 1, 0), "+$%d" % c["pay"], Color(1, 0.85, 0.2))
+	var txt := "+$%d" % total
+	if streak >= 2:
+		txt += "\nStreak x%d!" % streak
+	float_text(n.position + Vector3(0, 1, 0), txt, Color(1, 0.85, 0.2))
 	(c["label"] as Label3D).text = "Thanks!"
 	(c["label"] as Label3D).modulate = Color(0.6, 1, 0.6)
 	c["leaving"] = true
@@ -1113,6 +1530,10 @@ func update_cars(delta: float) -> void:
 			if c["patience"] <= 0:
 				lbl.text = "Too slow!"
 				c["leaving"] = true
+				if streak >= 2:
+					toast("Sale streak lost!")
+				streak = 0
+				refresh_ui()
 		else:
 			lbl.text = "%d %s\n$%d" % [c["qty"], item_name(c["want"]), c["pay"]]
 			lbl.modulate = Color.WHITE
@@ -1156,6 +1577,9 @@ func gain_xp(n: int) -> void:
 		for a in ANIMAL_ORDER:
 			if ANIMALS[a]["lvl"] == level:
 				unlocks.append(ANIMALS[a]["n"] + "s")
+		for k in range(1, LAND_LVL.size()):
+			if LAND_LVL[k] == level:
+				unlocks.append("Farm expansion")
 		var msg := "LEVEL %d!" % level
 		if unlocks.size() > 0:
 			msg += "  Unlocked: " + ", ".join(unlocks)
@@ -1186,25 +1610,120 @@ func buy_upgrade(id: String) -> void:
 	refresh_helpers()
 
 
+
+# ================= orders =================
+
+func new_order() -> Dictionary:
+	var goods := available_goods()
+	goods.shuffle()
+	var n := mini(goods.size(), 1 + randi() % mini(3, 1 + int(level / 3.0)))
+	var items := {}
+	var value := 0
+	for k in n:
+		var g: String = goods[k]
+		var q := 2 + randi() % (1 + mini(level, 6))
+		items[g] = q
+		value += ITEMS[g]["p"] * q
+	return {"items": items, "pay": int(value * 2.5) + 10 * level, "xp": int(value * 0.6) + 5}
+
+
+func fill_orders() -> void:
+	while orders.size() < ORDER_SLOTS:
+		orders.append(new_order())
+
+
+func can_fill(o: Dictionary) -> bool:
+	for k in o["items"]:
+		if have(k) < o["items"][k]:
+			return false
+	return true
+
+
+func deliver_order(i: int) -> void:
+	var o: Dictionary = orders[i]
+	if not can_fill(o):
+		toast("You don't have everything yet")
+		play("nope")
+		return
+	for k in o["items"]:
+		inv[k] = have(k) - o["items"][k]
+	coins += o["pay"]
+	play("coin")
+	toast("Order delivered! +$%d" % o["pay"])
+	orders.remove_at(i)
+	fill_orders()
+	gain_xp(o["xp"])
+	build_orders_panel()
+
+
+func skip_order(i: int) -> void:
+	orders.remove_at(i)
+	fill_orders()
+	play("pop")
+	build_orders_panel()
+
+
+func build_orders_panel() -> void:
+	for c in orders_box.get_children():
+		c.queue_free()
+	order_btns.clear()
+	var t := Label.new()
+	t.text = "Orders"
+	t.add_theme_font_size_override("font_size", 34)
+	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	orders_box.add_child(t)
+	var sub := Label.new()
+	sub.text = "Big deliveries pay much more than cars"
+	sub.add_theme_font_size_override("font_size", 20)
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	orders_box.add_child(sub)
+	for i in orders.size():
+		var o: Dictionary = orders[i]
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 10)
+		var parts := []
+		for k in o["items"]:
+			parts.append("%d %s (%d)" % [o["items"][k], item_name(k), have(k)])
+		var l := Label.new()
+		l.text = ", ".join(parts) + "\nReward: $%d  +%d XP" % [o["pay"], o["xp"]]
+		l.add_theme_font_size_override("font_size", 20)
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		l.custom_minimum_size = Vector2(420, 0)
+		row.add_child(l)
+		var d := big_button("Deliver")
+		d.disabled = not can_fill(o)
+		d.pressed.connect(deliver_order.bind(i))
+		row.add_child(d)
+		order_btns.append(d)
+		var s := big_button("Skip")
+		s.pressed.connect(skip_order.bind(i))
+		row.add_child(s)
+		orders_box.add_child(row)
+	var close := big_button("Close")
+	close.pressed.connect(func(): orders_panel.visible = false)
+	orders_box.add_child(close)
+
 # ================= main loop & input =================
 
 func _process(delta: float) -> void:
 	clock += delta
-	for i in PLOT_COUNT:
+	for i in plots.size():
 		var p: Dictionary = plots[i]
 		if p["crop"] == "":
 			continue
 		var need: float = CROPS[p["crop"]]["t"]
 		p["t"] = minf(p["t"] + delta * grow_mult(), need)
-		var crop: Node3D = plot_nodes[i]["crop"]
-		if crop == null:
-			continue
+		var pn: Dictionary = plot_nodes[i]
+		if crop_stage(p) != pn["stage"]:
+			refresh_plot(i)
+		var crop: Node3D = pn["crop"]
 		var prog: float = p["t"] / need
 		if prog >= 1.0:
 			crop.scale = Vector3.ONE
-			crop.position.y = 0.25 + absf(sin(clock * 4.0 + i)) * 0.15
+			crop.position.y = 0.22 + absf(sin(clock * 4.0 + i)) * 0.08
+			crop.rotation.z = sin(clock * 2.5 + i) * 0.05
 		else:
-			crop.scale = Vector3.ONE * lerpf(0.25, 1.0, prog)
+			crop.scale = Vector3.ONE * lerpf(0.75, 1.0, prog)
 	for id in STATION_ORDER:
 		var s: Dictionary = stations[id]
 		var spin: Node3D = station_nodes[id]["spin"]
@@ -1256,7 +1775,7 @@ func _unhandled_input(e: InputEvent) -> void:
 			var k := 0.03 * cam_zoom * (800.0 / get_viewport().get_visible_rect().size.y)
 			cam_target.x -= mm.relative.x * k
 			cam_target.z -= mm.relative.y * k
-			cam_target.x = clampf(cam_target.x, -14, 18)
+			cam_target.x = clampf(cam_target.x, -30, 20)
 			cam_target.z = clampf(cam_target.z, -10, 8)
 			update_camera()
 	elif e is InputEventMagnifyGesture:
@@ -1294,6 +1813,10 @@ func tap(pos: Vector2) -> void:
 			buy_animal(id)
 		"car":
 			tap_car(id)
+		"field":
+			tap_field(hit["position"])
+		"expand":
+			buy_land()
 
 
 # ================= UI =================
@@ -1343,6 +1866,11 @@ func build_ui() -> void:
 	ui_xp.custom_minimum_size = Vector2(230, 14)
 	ui_xp.show_percentage = false
 	v.add_child(ui_xp)
+	ui_streak = Label.new()
+	ui_streak.add_theme_font_size_override("font_size", 22)
+	ui_streak.add_theme_color_override("font_color", Color(1, 0.6, 0.3))
+	ui_streak.visible = false
+	v.add_child(ui_streak)
 	ui_inv = Label.new()
 	ui_inv.add_theme_font_size_override("font_size", 21)
 	v.add_child(ui_inv)
@@ -1355,7 +1883,7 @@ func build_ui() -> void:
 	tr.add_theme_constant_override("separation", 10)
 	root.add_child(tr)
 	var ub := big_button("Upgrades")
-	ub.pressed.connect(func(): build_upgrade_panel(); upg_panel.visible = not upg_panel.visible; help_panel.visible = false)
+	ub.pressed.connect(func(): build_upgrade_panel(); upg_panel.visible = not upg_panel.visible; help_panel.visible = false; orders_panel.visible = false)
 	tr.add_child(ub)
 	var hb := big_button(" ? ")
 	hb.pressed.connect(func(): show_help(0))
@@ -1372,6 +1900,14 @@ func build_ui() -> void:
 	zo.pressed.connect(func(): zoom(0.15))
 	tr.add_child(zo)
 	tr.move_child(zo, 1)
+	build_btn = big_button(" Build ")
+	build_btn.pressed.connect(toggle_build)
+	tr.add_child(build_btn)
+	tr.move_child(build_btn, 2)
+	orders_btn = big_button("Orders")
+	orders_btn.pressed.connect(func(): build_orders_panel(); orders_panel.visible = not orders_panel.visible; upg_panel.visible = false)
+	tr.add_child(orders_btn)
+	tr.move_child(orders_btn, 3)
 
 	seed_box = VBoxContainer.new()
 	seed_box.set_anchors_and_offsets_preset(Control.PRESET_CENTER_RIGHT)
@@ -1398,6 +1934,12 @@ func build_ui() -> void:
 	upg_box.add_theme_constant_override("separation", 10)
 	upg_panel.add_child(upg_box)
 	upg_panel.visible = false
+
+	orders_panel = center_panel(root)
+	orders_box = VBoxContainer.new()
+	orders_box.add_theme_constant_override("separation", 10)
+	orders_panel.add_child(orders_box)
+	orders_panel.visible = false
 
 	help_panel = center_panel(root)
 	var hv := VBoxContainer.new()
@@ -1465,10 +2007,12 @@ func help_pages() -> Array:
 		recipes.append("- %s (Lv %d): %s makes %s" % [st["n"], st["lvl"], recipe_text(st["in"]), item_name(st["out"])])
 	return [
 		["Welcome to Barry's Barn!", "Barry's farm stand sits next to a busy road. Grow crops, raise animals, cook tasty goods and sell them to the cars that stop by.\n\nEarn money to buy more plots, animals, stations and helpers. Selling also earns XP, and every new level unlocks something new.\n\nTap Next for a quick tour. You can open this again with the ? button."],
-		["Crops", "1. Pick a seed on the right side of the screen.\n2. Tap a brown dirt plot to plant it.\n3. When the crop starts bouncing it is ready: tap it to harvest 2.\n\nHarvested plots replant the same seed by themselves. Green plots are locked: tap the one marked \"Buy Plot\" to expand your field.\n\nWheat seeds are free, so you can never get stuck."],
+		["Crops", "1. Pick a seed on the right side of the screen.\n2. Tap an empty plot to plant it.\n3. Crops sprout, grow leaves, then fruit. When a crop starts bouncing it is ripe: tap it to harvest 2.\n\nHarvested plots replant the same seed by themselves. Wheat seeds are free, so you can never get stuck.\n\nLucky plants turn GOLDEN when ripe: double crops plus bonus cash!"],
+		["Building & Expanding", "Tap Build to edit your field. Glowing + spots are free ground:\n\n- Tap a + spot to buy a new plot right there.\n- Tap a plot, then a + spot, to move it (its crop comes along).\n\nOut of room? Tap the Expand Farm sign next to your field to buy more land. Bigger farms unlock at levels 3, 5 and 8. Tap Done when you're finished."],
 		["Animals", "Chickens lay eggs, cows give milk (level 3) and pigs give bacon (level 5).\n\nWhen an egg, milk bucket or bacon floats above an animal, tap the animal to collect it.\n\nBuy more animals from the signs in front of the pen."],
 		["Kitchen Stations", "Stations turn raw items into goods that sell for much more. Tap an empty pad to build one, then tap it to start cooking. It keeps cooking by itself while you have ingredients. Tap it when it says READY to collect.\n\n" + "\n".join(recipes)],
 		["Selling", "Cars line up at the farm stand. Each shows what it wants, the price, and how long it will wait.\n\nTap a car to sell. If you don't have what it wants, keep farming: it will wait a while, and new cars ask for things you already have more often."],
+		["Orders & Streaks", "The Orders board has big deliveries that pay much more than cars. Deliver one and a new order arrives. Don't like one? Skip it.\n\nSell to cars back to back to build a sale streak: each car in a row pays 5% more, up to +50%. Let a car leave unhappy and the streak resets!"],
 		["Helpers (automation)", "Tired of tapping? Hire helpers in the Upgrades menu. They show up on the farm and keep working while you play:\n\n- Scarecrow Farmhand: harvests ripe crops\n- Barn Robot: collects eggs, milk and bacon\n- Kitchen Helper: collects and restarts stations\n- Stand Clerk: sells to cars when you have their order\n\nEach helper can be upgraded twice to work faster. With all four, your farm runs itself."],
 		["Controls & Tips", "- Tap: plant, harvest, collect, build, sell\n- Drag: move the camera\n- + / - buttons (or mouse wheel / pinch): zoom\n- II button: pause, sound, restart\n\nTips: build the Mill early, since flour sells for nearly 4x wheat. Hire the Stand Clerk first so cars never leave unhappy. The game saves by itself."],
 	]
@@ -1483,6 +2027,7 @@ func show_help(page: int) -> void:
 	help_prev.disabled = help_page == 0
 	help_next.disabled = help_page == pages.size() - 1
 	upg_panel.visible = false
+	orders_panel.visible = false
 	help_panel.visible = true
 	get_tree().paused = true
 
@@ -1499,6 +2044,7 @@ func set_paused(p: bool) -> void:
 	get_tree().paused = p
 	pause_panel.visible = p
 	upg_panel.visible = false
+	orders_panel.visible = false
 	help_panel.visible = false
 	reset_btn.text = "Start New Farm"
 
@@ -1529,10 +2075,9 @@ func update_helpers(delta: float) -> void:
 		helper_timers[h] = HELPER_INTERVAL[lv]
 		match h:
 			"farmhand":
-				for i in PLOT_COUNT:
-					var p: Dictionary = plots[i]
-					if p["open"] and p["crop"] != "" and p["t"] >= CROPS[p["crop"]]["t"]:
-						tap_plot(i)
+				for i in plots.size():
+					if ripe(plots[i]):
+						harvest_plot(i)
 						send_helper(h, plot_pos(i) + Vector3(0, 0, 1.3))
 						break
 			"collector":
@@ -1562,7 +2107,7 @@ func update_helpers(delta: float) -> void:
 func helper_home(h: String) -> Vector3:
 	match h:
 		"farmhand":
-			return Vector3(-16.6, 0, -1.0)
+			return Vector3(-3.2, 0, -7.0)
 		"collector":
 			return Vector3(8.4, 0, -8.8)
 		"chef":
@@ -1705,7 +2250,8 @@ func build_seed_bar() -> void:
 	for id in CROP_ORDER:
 		var cd: Dictionary = CROPS[id]
 		var b := big_button("")
-		b.custom_minimum_size = Vector2(150, 72)
+		b.custom_minimum_size = Vector2(150, 58)
+		b.add_theme_font_size_override("font_size", 20)
 		if level < cd["lvl"]:
 			b.text = "%s\nLv %d" % [item_name(id), cd["lvl"]]
 			b.disabled = true
@@ -1768,9 +2314,18 @@ func refresh_ui() -> void:
 			lines.append("%s  x%d" % [item_name(id), have(id)])
 	ui_inv.text = "\n".join(lines) if lines.size() > 0 else "(basket empty)"
 	refresh_pen_signs()
-	var nl := next_locked()
-	if nl >= 0:
-		(plot_nodes[nl]["label"] as Label3D).text = "Buy Plot\n$%d" % plot_cost()
+	refresh_sale_sign()
+	if ui_streak:
+		ui_streak.visible = streak >= 2
+		ui_streak.text = "Sale streak x%d (+%d%%)" % [streak, mini(streak, 10) * 5]
+	if orders_btn:
+		var ready := false
+		for k in orders.size():
+			var ok := can_fill(orders[k])
+			ready = ready or ok
+			if k < order_btns.size() and is_instance_valid(order_btns[k]):
+				(order_btns[k] as Button).disabled = not ok
+		orders_btn.text = "Orders!" if ready else "Orders"
 
 
 func toast(msg: String, dur := 2.0) -> void:
@@ -1789,7 +2344,8 @@ func save_game() -> void:
 	if resetting:
 		return
 	var d := {"coins": coins, "xp": xp, "level": level, "inv": inv, "plots": plots, "stations": stations,
-		"animals": animals, "upg": upg, "sel": sel_crop, "help": seen_help, "muted": muted}
+		"animals": animals, "upg": upg, "sel": sel_crop, "help": seen_help, "muted": muted,
+		"land": land, "orders": orders, "streak": streak}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f:
 		f.store_string(JSON.stringify(d))
@@ -1805,13 +2361,41 @@ func load_game() -> void:
 	xp = int(d.get("xp", 0))
 	level = int(d.get("level", 1))
 	sel_crop = str(d.get("sel", "wheat"))
+	if not CROPS.has(sel_crop):
+		sel_crop = "wheat"
+	land = clampi(int(d.get("land", 0)), 0, LAND.size() - 1)
+	streak = int(d.get("streak", 0))
 	seen_help = bool(d.get("help", false))
 	inv = {}
 	for k in d.get("inv", {}):
 		inv[k] = int(d["inv"][k])
 	var ps: Array = d.get("plots", [])
-	for i in mini(ps.size(), PLOT_COUNT):
-		plots[i] = {"open": bool(ps[i]["open"]), "crop": str(ps[i]["crop"]), "t": float(ps[i]["t"])}
+	if ps.size() > 0:
+		plots = []
+		for k in ps.size():
+			var p: Dictionary = ps[k]
+			var crop := str(p.get("crop", ""))
+			if not CROPS.has(crop):
+				crop = ""
+			var e := {"crop": crop, "t": float(p.get("t", 0.0)), "gold": bool(p.get("gold", false))}
+			if p.has("x"):
+				e["x"] = int(p["x"])
+				e["z"] = int(p["z"])
+			elif bool(p.get("open", false)):
+				# saves from before free placement: plots sat in a fixed 4-wide grid
+				e["x"] = k % 4
+				e["z"] = int(k / 4.0)
+			else:
+				continue
+			plots.append(e)
+	orders = []
+	for o in d.get("orders", []):
+		var items := {}
+		for k in o.get("items", {}):
+			if ITEMS.has(k):
+				items[k] = int(o["items"][k])
+		if items.size() > 0:
+			orders.append({"items": items, "pay": int(o.get("pay", 0)), "xp": int(o.get("xp", 0))})
 	var ss: Dictionary = d.get("stations", {})
 	for id in ss:
 		if stations.has(id):
