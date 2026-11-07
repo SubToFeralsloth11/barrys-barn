@@ -9,6 +9,7 @@ const ITEMS := {
 	"pumpkin": {"n": "Pumpkin", "p": 18, "c": Color(1.0, 0.45, 0.05)},
 	"egg": {"n": "Egg", "p": 6, "c": Color(1.0, 0.96, 0.88)},
 	"milk": {"n": "Milk", "p": 12, "c": Color(0.96, 0.97, 1.0)},
+	"bacon": {"n": "Bacon", "p": 24, "c": Color(0.85, 0.35, 0.3)},
 	"flour": {"n": "Flour", "p": 11, "c": Color(0.98, 0.95, 0.85)},
 	"juice": {"n": "Carrot Juice", "p": 20, "c": Color(1.0, 0.6, 0.2)},
 	"cheese": {"n": "Cheese", "p": 34, "c": Color(1.0, 0.85, 0.3)},
@@ -16,7 +17,7 @@ const ITEMS := {
 	"popcorn": {"n": "Popcorn", "p": 32, "c": Color(1.0, 0.98, 0.8)},
 	"pie": {"n": "Pumpkin Pie", "p": 85, "c": Color(0.95, 0.55, 0.2)},
 }
-const ITEM_ORDER := ["wheat", "carrot", "corn", "pumpkin", "egg", "milk", "flour", "juice", "cheese", "bread", "popcorn", "pie"]
+const ITEM_ORDER := ["wheat", "carrot", "corn", "pumpkin", "egg", "milk", "bacon", "flour", "juice", "cheese", "bread", "popcorn", "pie"]
 const CROP_ORDER := ["wheat", "carrot", "corn", "pumpkin"]
 const CROPS := {
 	"wheat": {"t": 8.0, "lvl": 1, "seed": 0},
@@ -33,10 +34,12 @@ const STATIONS := {
 	"popper": {"n": "Popcorn Pot", "in": {"corn": 2}, "out": "popcorn", "t": 8.0, "cost": 380, "lvl": 5, "c": Color(1.0, 0.95, 0.5)},
 	"oven": {"n": "Pie Oven", "in": {"pumpkin": 1, "flour": 1, "egg": 1}, "out": "pie", "t": 16.0, "cost": 800, "lvl": 7, "c": Color(0.8, 0.45, 0.35)},
 }
-const ANIMAL_ORDER := ["chicken", "cow"]
+const ANIMAL_ORDER := ["chicken", "cow", "pig"]
+## h = height the ready product floats at, spd = walk speed.
 const ANIMALS := {
-	"chicken": {"n": "Chicken", "out": "egg", "t": 12.0, "cost": 40, "lvl": 1, "max": 6},
-	"cow": {"n": "Cow", "out": "milk", "t": 20.0, "cost": 150, "lvl": 3, "max": 4},
+	"chicken": {"n": "Chicken", "out": "egg", "t": 12.0, "cost": 40, "lvl": 1, "max": 6, "h": 1.5, "spd": 1.4},
+	"cow": {"n": "Cow", "out": "milk", "t": 20.0, "cost": 150, "lvl": 3, "max": 4, "h": 2.4, "spd": 0.7},
+	"pig": {"n": "Pig", "out": "bacon", "t": 26.0, "cost": 260, "lvl": 5, "max": 4, "h": 1.7, "spd": 0.9},
 }
 const UPGRADE_ORDER := ["farmhand", "collector", "chef", "seller", "fert", "feed", "sign", "fame"]
 const UPGRADES := {
@@ -99,6 +102,7 @@ var plot_nodes := []
 var station_nodes := {}
 var animal_nodes := []
 var cars := []
+var helper_nodes := {}
 var ambient := []
 var car_timer := 3.0
 var ambient_timer := 2.0
@@ -133,6 +137,7 @@ func _ready() -> void:
 	for i in animals.size():
 		spawn_animal_node(i)
 	refresh_pen_signs()
+	refresh_helpers()
 	refresh_ui()
 	if not seen_help:
 		show_help(0)
@@ -150,14 +155,26 @@ func new_game_state() -> void:
 
 # ================= helpers =================
 
-func mat(c: Color) -> StandardMaterial3D:
-	if mats.has(c):
-		return mats[c]
+func mat(c: Color, metal := 0.0, glow := false) -> StandardMaterial3D:
+	var key := [c, metal, glow]
+	if mats.has(key):
+		return mats[key]
 	var m := StandardMaterial3D.new()
 	m.albedo_color = c
-	m.roughness = 0.85
-	mats[c] = m
+	m.roughness = 0.35 if metal > 0.0 else 0.75
+	m.metallic = metal
+	if glow:
+		m.emission_enabled = true
+		m.emission = c
+		m.emission_energy_multiplier = 2.0
+	mats[key] = m
 	return m
+
+
+## Re-skins a part with a shiny metal or glowing material.
+func skin(mi: MeshInstance3D, c: Color, metal := 0.0, glow := false) -> MeshInstance3D:
+	mi.material_override = mat(c, metal, glow)
+	return mi
 
 
 func box(parent: Node, size: Vector3, pos: Vector3, c: Color) -> MeshInstance3D:
@@ -166,7 +183,7 @@ func box(parent: Node, size: Vector3, pos: Vector3, c: Color) -> MeshInstance3D:
 	return add_mesh(parent, bm, pos, c)
 
 
-func cyl(parent: Node, r_top: float, r_bot: float, h: float, pos: Vector3, c: Color, seg := 7) -> MeshInstance3D:
+func cyl(parent: Node, r_top: float, r_bot: float, h: float, pos: Vector3, c: Color, seg := 12) -> MeshInstance3D:
 	var cm := CylinderMesh.new()
 	cm.top_radius = r_top
 	cm.bottom_radius = r_bot
@@ -180,8 +197,8 @@ func sph(parent: Node, r: float, pos: Vector3, c: Color, sc := Vector3.ONE) -> M
 	var sm := SphereMesh.new()
 	sm.radius = r
 	sm.height = r * 2.0
-	sm.radial_segments = 8
-	sm.rings = 5
+	sm.radial_segments = 16
+	sm.rings = 8
 	var mi := add_mesh(parent, sm, pos, c)
 	mi.scale = sc
 	return mi
@@ -316,18 +333,27 @@ func play(name: String) -> void:
 func build_world() -> void:
 	var env := WorldEnvironment.new()
 	var e := Environment.new()
-	e.background_mode = Environment.BG_COLOR
-	e.background_color = Color(0.55, 0.8, 1.0)
+	var sky_mat := ProceduralSkyMaterial.new()
+	sky_mat.sky_top_color = Color(0.32, 0.6, 0.95)
+	sky_mat.sky_horizon_color = Color(0.75, 0.88, 1.0)
+	sky_mat.ground_horizon_color = Color(0.6, 0.75, 0.55)
+	sky_mat.ground_bottom_color = Color(0.3, 0.45, 0.25)
+	var sky := Sky.new()
+	sky.sky_material = sky_mat
+	e.background_mode = Environment.BG_SKY
+	e.sky = sky
 	e.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	e.ambient_light_color = Color(0.85, 0.88, 1.0)
 	e.ambient_light_energy = 0.35
+	e.reflected_light_source = Environment.REFLECTION_SOURCE_DISABLED
 	e.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.environment = e
 	add_child(env)
 
 	var sun := DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-55, -35, 0)
-	sun.light_energy = 1.0
+	sun.light_energy = 1.15
+	sun.light_color = Color(1.0, 0.96, 0.88)
 	sun.shadow_enabled = true
 	sun.directional_shadow_max_distance = 60.0
 	add_child(sun)
@@ -379,15 +405,34 @@ func station_pos(i: int) -> Vector3:
 
 func build_barn() -> void:
 	var b := node_at(self, Vector3(-10, 0, -14))
-	box(b, Vector3(7, 4, 5.5), Vector3(0, 2, 0), Color(0.75, 0.15, 0.12))
+	var red := Color(0.75, 0.15, 0.12)
+	box(b, Vector3(7, 4, 5.5), Vector3(0, 2, 0), red)
+	box(b, Vector3(7.2, 0.3, 5.7), Vector3(0, 0.15, 0), Color(0.5, 0.45, 0.42))
 	prism(b, Vector3(7.6, 2.4, 6), Vector3(0, 5.2, 0), Color(0.35, 0.3, 0.3))
-	box(b, Vector3(2.6, 3, 0.1), Vector3(0, 1.5, 2.8), Color(0.55, 0.1, 0.08))
-	box(b, Vector3(2.8, 0.2, 0.15), Vector3(0, 1.5, 2.86), Color.WHITE).rotation_degrees.z = 48
-	box(b, Vector3(2.8, 0.2, 0.15), Vector3(0, 1.5, 2.86), Color.WHITE).rotation_degrees.z = -48
-	var sign_l := label3d(b, "BARRY'S BARN", Vector3(0, 4.6, 3.1), 110, false)
+	prism(b, Vector3(7.0, 2.0, 5.5), Vector3(0, 5.0, 0.02), red)
+	# white trim on corners and gable
+	for x in [-3.5, 3.5]:
+		for zz in [-2.75, 2.75]:
+			box(b, Vector3(0.22, 4.0, 0.22), Vector3(x, 2, zz), Color.WHITE)
+	box(b, Vector3(7.2, 0.22, 0.22), Vector3(0, 4.0, 2.78), Color.WHITE)
+	box(b, Vector3(2.9, 3.2, 0.12), Vector3(0, 1.6, 2.78), Color.WHITE)
+	box(b, Vector3(2.6, 3, 0.1), Vector3(0, 1.5, 2.82), Color(0.55, 0.1, 0.08))
+	box(b, Vector3(2.8, 0.2, 0.15), Vector3(0, 1.5, 2.88), Color.WHITE).rotation_degrees.z = 48
+	box(b, Vector3(2.8, 0.2, 0.15), Vector3(0, 1.5, 2.88), Color.WHITE).rotation_degrees.z = -48
+	# hayloft window
+	box(b, Vector3(1.3, 1.1, 0.1), Vector3(0, 5.0, 2.78), Color.WHITE)
+	box(b, Vector3(1.0, 0.8, 0.1), Vector3(0, 5.0, 2.82), Color(0.25, 0.15, 0.1))
+	sph(b, 0.45, Vector3(0, 4.85, 2.85), Color(0.95, 0.85, 0.35), Vector3(1.4, 0.6, 0.4))
+	var sign_l := label3d(b, "BARRY'S BARN", Vector3(0, 4.25, 3.1), 90, false)
 	sign_l.modulate = Color(1, 0.95, 0.7)
-	cyl(b, 1.3, 1.3, 7, Vector3(5.2, 3.5, -0.5), Color(0.75, 0.75, 0.8), 10)
-	sph(b, 1.3, Vector3(5.2, 7, -0.5), Color(0.5, 0.55, 0.65))
+	# silo with bands and dome
+	skin(cyl(b, 1.3, 1.3, 7, Vector3(5.2, 3.5, -0.5), Color(0.78, 0.78, 0.82), 20), Color(0.78, 0.78, 0.82), 0.5)
+	for h in [1.2, 3.0, 4.8, 6.6]:
+		skin(cyl(b, 1.34, 1.34, 0.12, Vector3(5.2, h, -0.5), Color(0.55, 0.58, 0.62), 20), Color(0.55, 0.58, 0.62), 0.6)
+	skin(sph(b, 1.3, Vector3(5.2, 7, -0.5), Color(0.5, 0.55, 0.65)), Color(0.5, 0.55, 0.65), 0.6)
+	# hay bales
+	for hp in [Vector3(-4.6, 0.45, 2.2), Vector3(-4.6, 0.45, 1.0), Vector3(-4.6, 1.3, 1.6)]:
+		cyl(b, 0.45, 0.45, 1.0, hp, Color(0.92, 0.8, 0.4), 14).rotation_degrees.x = 90
 
 
 func build_stand() -> void:
@@ -439,9 +484,10 @@ func build_pen() -> void:
 	# buy signs
 	for i in ANIMAL_ORDER.size():
 		var id: String = ANIMAL_ORDER[i]
-		var sn := node_at(self, Vector3(2.5 + i * 5.0, 0, -2.4))
+		var sn := node_at(self, Vector3(1.6 + i * 3.4, 0, -2.4))
 		box(sn, Vector3(0.12, 1.2, 0.12), Vector3(0, 0.6, 0), WOOD)
-		box(sn, Vector3(2.4, 1.0, 0.1), Vector3(0, 1.4, 0), Color(0.95, 0.9, 0.75))
+		box(sn, Vector3(2.3, 1.05, 0.08), Vector3(0, 1.4, -0.02), WOOD)
+		box(sn, Vector3(2.2, 0.95, 0.1), Vector3(0, 1.4, 0), Color(0.95, 0.9, 0.75))
 		var l := label3d(sn, "", Vector3(0, 1.4, 0.08), 34, false)
 		l.modulate = Color(0.2, 0.12, 0.05)
 		l.outline_size = 0
@@ -464,11 +510,18 @@ func build_decor() -> void:
 	for p in spots:
 		var t := node_at(self, p)
 		var s := rng.randf_range(0.8, 1.5)
-		cyl(t, 0.18 * s, 0.25 * s, 1.4 * s, Vector3(0, 0.7 * s, 0), Color(0.45, 0.3, 0.18), 5)
+		cyl(t, 0.16 * s, 0.26 * s, 1.4 * s, Vector3(0, 0.7 * s, 0), Color(0.45, 0.3, 0.18), 8)
 		if rng.randf() < 0.5:
-			cyl(t, 0, 1.2 * s, 2.6 * s, Vector3(0, 2.4 * s, 0), Color(0.2, 0.55, 0.3), 6)
+			var pine := Color(0.16, 0.45, 0.26)
+			for k in 3:
+				var f := 1.0 - k * 0.25
+				cyl(t, 0, 1.3 * s * f, 1.6 * s, Vector3(0, (1.7 + k * 0.85) * s, 0), pine.lightened(k * 0.06), 10)
 		else:
-			sph(t, 1.1 * s, Vector3(0, 2.1 * s, 0), Color(0.3, 0.65, 0.25))
+			var leaf := Color(0.3, 0.62, 0.25)
+			sph(t, 1.0 * s, Vector3(0, 2.1 * s, 0), leaf)
+			sph(t, 0.75 * s, Vector3(0.6 * s, 2.5 * s, 0.2 * s), leaf.lightened(0.08))
+			sph(t, 0.7 * s, Vector3(-0.55 * s, 2.4 * s, -0.3 * s), leaf.darkened(0.08))
+			sph(t, 0.6 * s, Vector3(0.1 * s, 2.9 * s, -0.1 * s), leaf.lightened(0.12))
 	for i in 12:
 		var x := -16.0 + i * 3.4
 		if x > -1.5 and x < 0.5:
@@ -480,8 +533,15 @@ func build_decor() -> void:
 func build_station_model(id: String, b: Node3D) -> void:
 	var c: Color = STATIONS[id]["c"]
 	box(b, Vector3(2.4, 1.6, 1.9), Vector3(0, 0.9, 0), c)
+	box(b, Vector3(2.5, 0.2, 2.0), Vector3(0, 0.1, 0), c.darkened(0.3))
 	prism(b, Vector3(2.7, 0.9, 2.2), Vector3(0, 2.15, 0), Color(0.7, 0.2, 0.15))
-	box(b, Vector3(0.7, 1.0, 0.05), Vector3(0, 0.6, 0.97), Color(0.4, 0.25, 0.15))
+	box(b, Vector3(2.75, 0.08, 2.25), Vector3(0, 1.72, 0), Color.WHITE)
+	box(b, Vector3(0.85, 1.12, 0.05), Vector3(0, 0.62, 0.96), Color.WHITE)
+	box(b, Vector3(0.7, 1.0, 0.05), Vector3(0, 0.6, 0.98), Color(0.4, 0.25, 0.15))
+	sph(b, 0.05, Vector3(0.22, 0.6, 1.02), Color(0.95, 0.8, 0.3))
+	for x in [-1.21, 1.21]:
+		box(b, Vector3(0.05, 0.6, 0.7), Vector3(x, 1.05, 0), Color.WHITE)
+		box(b, Vector3(0.06, 0.48, 0.58), Vector3(x, 1.05, 0), Color(0.55, 0.8, 0.95))
 	var spin := node_at(b, Vector3(0.75, 1.2, 1.0))
 	spin.name = "Spin"
 	match id:
@@ -745,35 +805,94 @@ func spawn_animal_node(i: int) -> void:
 	add_child(n)
 	n.position = Vector3(randf_range(PEN_MIN.x, PEN_MAX.x), 0, randf_range(PEN_MIN.y, PEN_MAX.y))
 	var body := node_at(n, Vector3.ZERO)
-	var prod: Node3D
-	if type == "chicken":
-		sph(body, 0.3, Vector3(0, 0.45, 0), Color.WHITE, Vector3(1, 0.9, 1.3))
-		sph(body, 0.17, Vector3(0, 0.8, 0.28), Color.WHITE)
-		box(body, Vector3(0.06, 0.12, 0.14), Vector3(0, 0.98, 0.28), Color(0.9, 0.1, 0.1))
-		box(body, Vector3(0.08, 0.06, 0.12), Vector3(0, 0.78, 0.47), Color(1, 0.6, 0.1))
-		for x in [-0.1, 0.1]:
-			box(body, Vector3(0.05, 0.25, 0.05), Vector3(x, 0.12, 0), Color(1, 0.6, 0.1))
-		prod = node_at(n, Vector3(0, 1.5, 0))
-		sph(prod, 0.18, Vector3.ZERO, Color(1, 0.96, 0.88), Vector3(1, 1.3, 1))
-		add_hit(n, Vector3(1.2, 1.6, 1.2), Vector3(0, 0.7, 0), "animal", i)
-	else:
-		box(body, Vector3(0.9, 0.8, 1.6), Vector3(0, 1.0, 0), Color.WHITE)
-		box(body, Vector3(0.92, 0.4, 0.5), Vector3(0, 1.15, 0.2), Color(0.12, 0.12, 0.12))
-		box(body, Vector3(0.6, 0.3, 0.4), Vector3(0.1, 0.9, -0.5), Color(0.12, 0.12, 0.12))
-		box(body, Vector3(0.6, 0.6, 0.6), Vector3(0, 1.35, 1.0), Color.WHITE)
-		box(body, Vector3(0.5, 0.25, 0.2), Vector3(0, 1.2, 1.35), Color(1, 0.7, 0.75))
-		for x in [-0.22, 0.22]:
-			box(body, Vector3(0.08, 0.2, 0.08), Vector3(x, 1.75, 0.95), Color(0.95, 0.9, 0.7))
-			sph(body, 0.05, Vector3(x, 1.45, 1.31), Color.BLACK)
-		for p in [Vector3(-0.3, 0.3, -0.6), Vector3(0.3, 0.3, -0.6), Vector3(-0.3, 0.3, 0.6), Vector3(0.3, 0.3, 0.6)]:
-			box(body, Vector3(0.18, 0.6, 0.18), p, Color.WHITE)
-		box(body, Vector3(0.3, 0.12, 0.3), Vector3(0, 0.55, -0.2), Color(1, 0.7, 0.75))
-		prod = node_at(n, Vector3(0, 2.4, 0))
-		cyl(prod, 0.22, 0.18, 0.4, Vector3.ZERO, Color(0.7, 0.7, 0.75))
-		cyl(prod, 0.2, 0.2, 0.05, Vector3(0, 0.2, 0), Color.WHITE)
-		add_hit(n, Vector3(1.4, 2.0, 2.2), Vector3(0, 1.0, 0), "animal", i)
+	var ad: Dictionary = ANIMALS[type]
+	var prod := node_at(n, Vector3(0, ad["h"], 0))
+	match type:
+		"chicken":
+			build_chicken(body, prod)
+			add_hit(n, Vector3(1.2, 1.6, 1.2), Vector3(0, 0.7, 0), "animal", i)
+		"cow":
+			build_cow(body, prod)
+			add_hit(n, Vector3(1.4, 2.0, 2.2), Vector3(0, 1.0, 0), "animal", i)
+		"pig":
+			build_pig(body, prod)
+			add_hit(n, Vector3(1.3, 1.5, 1.9), Vector3(0, 0.7, 0), "animal", i)
 	prod.visible = false
 	animal_nodes.append({"node": n, "body": body, "prod": prod, "target": n.position, "wait": randf() * 2.0})
+
+
+func build_chicken(b: Node3D, prod: Node3D) -> void:
+	var orange := Color(1, 0.6, 0.1)
+	var red := Color(0.9, 0.12, 0.1)
+	sph(b, 0.3, Vector3(0, 0.48, -0.02), Color.WHITE, Vector3(1, 0.9, 1.25))
+	sph(b, 0.2, Vector3(0, 0.68, -0.3), Color(0.97, 0.97, 0.95), Vector3(0.7, 1.3, 0.8)).rotation_degrees.x = -30
+	for x in [-0.27, 0.27]:
+		sph(b, 0.16, Vector3(x, 0.5, -0.02), Color(0.93, 0.93, 0.9), Vector3(0.35, 0.8, 1.3))
+	sph(b, 0.17, Vector3(0, 0.82, 0.26), Color.WHITE)
+	for k in 3:
+		sph(b, 0.055, Vector3(0, 1.0 + (1 - absf(k - 1)) * 0.03, 0.2 + k * 0.07), red)
+	sph(b, 0.05, Vector3(0, 0.68, 0.4), red, Vector3(0.7, 1.4, 0.7))
+	cyl(b, 0.0, 0.055, 0.13, Vector3(0, 0.8, 0.47), orange, 8).rotation_degrees.x = 90
+	for x in [-0.1, 0.1]:
+		sph(b, 0.035, Vector3(x, 0.86, 0.39), Color(0.05, 0.05, 0.05))
+		cyl(b, 0.025, 0.025, 0.28, Vector3(x, 0.14, 0), orange, 6)
+		box(b, Vector3(0.1, 0.02, 0.14), Vector3(x, 0.01, 0.04), orange)
+	sph(prod, 0.16, Vector3.ZERO, Color(1, 0.96, 0.88), Vector3(1, 1.3, 1))
+
+
+func build_cow(b: Node3D, prod: Node3D) -> void:
+	var black := Color(0.12, 0.12, 0.12)
+	var pink := Color(1, 0.72, 0.76)
+	sph(b, 0.55, Vector3(0, 1.05, 0), Color.WHITE, Vector3(0.85, 0.75, 1.5))
+	sph(b, 0.3, Vector3(0.38, 1.15, 0.2), black, Vector3(0.25, 0.9, 1.1))
+	sph(b, 0.25, Vector3(-0.38, 1.05, -0.35), black, Vector3(0.25, 0.9, 1.1))
+	sph(b, 0.24, Vector3(0.05, 1.42, -0.4), black, Vector3(1.1, 0.25, 1.0))
+	# head
+	sph(b, 0.3, Vector3(0, 1.38, 0.95), Color.WHITE, Vector3(0.95, 1.0, 1.15))
+	sph(b, 0.22, Vector3(0, 1.24, 1.22), pink, Vector3(1.1, 0.8, 0.8))
+	for x in [-0.08, 0.08]:
+		sph(b, 0.035, Vector3(x, 1.25, 1.39), Color(0.4, 0.2, 0.2))
+	for x in [-1.0, 1.0]:
+		sph(b, 0.045, Vector3(x * 0.17, 1.47, 1.18), Color(0.05, 0.05, 0.05))
+		cyl(b, 0.02, 0.05, 0.2, Vector3(x * 0.2, 1.68, 0.92), Color(0.95, 0.9, 0.7), 8).rotation_degrees.z = -x * 30.0
+		sph(b, 0.1, Vector3(x * 0.34, 1.48, 0.88), Color.WHITE, Vector3(1.4, 0.5, 0.8))
+	# legs, udder, tail
+	for p in [Vector3(-0.28, 0.35, -0.55), Vector3(0.28, 0.35, -0.55), Vector3(-0.28, 0.35, 0.55), Vector3(0.28, 0.35, 0.55)]:
+		cyl(b, 0.1, 0.09, 0.7, p, Color.WHITE, 10)
+		cyl(b, 0.1, 0.1, 0.1, p - Vector3(0, 0.33, 0), Color(0.25, 0.2, 0.18), 10)
+	sph(b, 0.17, Vector3(0, 0.62, -0.25), pink, Vector3(1.1, 0.8, 1.1))
+	cyl(b, 0.02, 0.025, 0.7, Vector3(0, 0.9, -0.85), Color.WHITE, 6).rotation_degrees.x = 15
+	sph(b, 0.07, Vector3(0, 0.55, -0.93), black, Vector3(1, 1.5, 1))
+	# milk bucket
+	skin(cyl(prod, 0.22, 0.18, 0.4, Vector3.ZERO, Color(0.7, 0.7, 0.75), 14), Color(0.7, 0.7, 0.75), 0.8)
+	cyl(prod, 0.2, 0.2, 0.05, Vector3(0, 0.2, 0), Color.WHITE, 14)
+
+
+func build_pig(b: Node3D, prod: Node3D) -> void:
+	var pink := Color(0.96, 0.5, 0.58)
+	var deep := Color(0.85, 0.35, 0.45)
+	sph(b, 0.42, Vector3(0, 0.62, 0), pink, Vector3(1.0, 0.9, 1.35))
+	sph(b, 0.3, Vector3(0, 0.75, 0.55), pink)
+	cyl(b, 0.13, 0.14, 0.12, Vector3(0, 0.7, 0.86), deep, 14).rotation_degrees.x = 90
+	for x in [-0.05, 0.05]:
+		sph(b, 0.03, Vector3(x, 0.7, 0.93), Color(0.45, 0.2, 0.25))
+	for x in [-1.0, 1.0]:
+		sph(b, 0.04, Vector3(x * 0.12, 0.85, 0.8), Color(0.05, 0.05, 0.05))
+		var ear := prism(b, Vector3(0.18, 0.18, 0.04), Vector3(x * 0.17, 1.02, 0.55), deep)
+		ear.rotation_degrees = Vector3(30, 0, -x * 25.0)
+	for p in [Vector3(-0.2, 0.15, -0.3), Vector3(0.2, 0.15, -0.3), Vector3(-0.2, 0.15, 0.3), Vector3(0.2, 0.15, 0.3)]:
+		cyl(b, 0.08, 0.07, 0.3, p, pink, 10)
+		cyl(b, 0.07, 0.07, 0.05, p - Vector3(0, 0.13, 0), Color(0.45, 0.3, 0.3), 10)
+	var tail := TorusMesh.new()
+	tail.inner_radius = 0.04
+	tail.outer_radius = 0.08
+	add_mesh(b, tail, Vector3(0, 0.75, -0.58), deep).rotation_degrees.x = 70
+	sph(b, 0.12, Vector3(0.25, 0.85, -0.1), Color(0.55, 0.38, 0.28), Vector3(1.0, 0.3, 1.2))
+	# bacon: three wavy rashers
+	for k in 3:
+		var s := box(prod, Vector3(0.5, 0.05, 0.12), Vector3(0, k * 0.06 - 0.06, (k - 1) * 0.06), Color(0.82, 0.25, 0.22))
+		s.rotation_degrees.z = (k - 1) * 12.0
+		box(s, Vector3(0.5, 0.055, 0.035), Vector3(0, 0, 0.03), Color(1.0, 0.88, 0.8))
 
 
 func tap_animal(i: int) -> void:
@@ -842,7 +961,7 @@ func update_animals(delta: float) -> void:
 		var prod: Node3D = an["prod"]
 		prod.visible = ready
 		if ready:
-			prod.position.y = (1.5 if a["type"] == "chicken" else 2.4) + sin(clock * 4.0 + i) * 0.12
+			prod.position.y = float(ad["h"]) + sin(clock * 4.0 + i) * 0.12
 			prod.rotation.y += delta * 2.0
 		an["wait"] -= delta
 		if an["wait"] > 0:
@@ -853,7 +972,7 @@ func update_animals(delta: float) -> void:
 			an["target"] = Vector3(randf_range(PEN_MIN.x, PEN_MAX.x), 0, randf_range(PEN_MIN.y, PEN_MAX.y))
 			an["wait"] = randf_range(1.0, 4.0)
 			continue
-		var speed := 1.4 if a["type"] == "chicken" else 0.7
+		var speed: float = ad["spd"]
 		n.position += to.normalized() * minf(speed * delta, to.length())
 		n.rotation.y = lerp_angle(n.rotation.y, atan2(to.x, to.z), delta * 6.0)
 		var body: Node3D = an["body"]
@@ -908,13 +1027,20 @@ func build_car(c: Color) -> Node3D:
 	add_child(n)
 	var body := node_at(n, Vector3.ZERO)
 	body.name = "Body"
-	box(body, Vector3(2.8, 0.7, 1.4), Vector3(0, 0.65, 0), c)
-	box(body, Vector3(1.5, 0.6, 1.25), Vector3(-0.2, 1.3, 0), c)
-	box(body, Vector3(1.52, 0.42, 1.27), Vector3(-0.2, 1.32, 0), Color(0.6, 0.85, 1.0))
-	box(body, Vector3(0.05, 0.2, 0.3), Vector3(1.41, 0.75, 0.45), Color(1, 1, 0.7))
-	box(body, Vector3(0.05, 0.2, 0.3), Vector3(1.41, 0.75, -0.45), Color(1, 1, 0.7))
+	box(body, Vector3(2.8, 0.55, 1.4), Vector3(0, 0.7, 0), c)
+	box(body, Vector3(2.7, 0.2, 1.36), Vector3(0, 0.38, 0), c.darkened(0.25))
+	skin(box(body, Vector3(1.5, 0.6, 1.25), Vector3(-0.2, 1.25, 0), c), c, 0.3)
+	skin(box(body, Vector3(1.3, 0.42, 1.27), Vector3(-0.2, 1.27, 0), Color(0.55, 0.75, 0.9)), Color(0.55, 0.75, 0.9), 0.6)
+	skin(box(body, Vector3(1.53, 0.42, 1.1), Vector3(-0.2, 1.27, 0), Color(0.55, 0.75, 0.9)), Color(0.55, 0.75, 0.9), 0.6)
+	box(body, Vector3(0.08, 0.6, 1.27), Vector3(-0.2, 1.25, 0), c)
+	for zz in [0.45, -0.45]:
+		skin(box(body, Vector3(0.05, 0.16, 0.3), Vector3(1.41, 0.78, zz), Color(1, 1, 0.75)), Color(1, 1, 0.75), 0.0, true)
+		skin(box(body, Vector3(0.05, 0.14, 0.25), Vector3(-1.41, 0.78, zz), Color(0.9, 0.1, 0.1)), Color(0.9, 0.1, 0.1), 0.0, true)
+	for xx in [1.44, -1.44]:
+		skin(box(body, Vector3(0.1, 0.14, 1.44), Vector3(xx, 0.45, 0), Color(0.75, 0.75, 0.78)), Color(0.75, 0.75, 0.78), 0.8)
 	for p in [Vector3(0.9, 0.32, 0.7), Vector3(-0.9, 0.32, 0.7), Vector3(0.9, 0.32, -0.7), Vector3(-0.9, 0.32, -0.7)]:
-		cyl(body, 0.32, 0.32, 0.25, p, Color(0.12, 0.12, 0.12), 8).rotation_degrees.x = 90
+		cyl(body, 0.32, 0.32, 0.25, p, Color(0.12, 0.12, 0.12), 16).rotation_degrees.x = 90
+		skin(cyl(body, 0.17, 0.17, 0.27, p, Color(0.8, 0.8, 0.85), 12), Color(0.8, 0.8, 0.85), 0.8).rotation_degrees.x = 90
 	return n
 
 
@@ -1057,6 +1183,7 @@ func buy_upgrade(id: String) -> void:
 	play("build")
 	refresh_ui()
 	build_upgrade_panel()
+	refresh_helpers()
 
 
 # ================= main loop & input =================
@@ -1093,6 +1220,7 @@ func _process(delta: float) -> void:
 	update_animals(delta)
 	update_cars(delta)
 	update_helpers(delta)
+	update_helper_bodies(delta)
 	ui_timer -= delta
 	if ui_timer <= 0:
 		ui_timer = 0.25
@@ -1338,10 +1466,10 @@ func help_pages() -> Array:
 	return [
 		["Welcome to Barry's Barn!", "Barry's farm stand sits next to a busy road. Grow crops, raise animals, cook tasty goods and sell them to the cars that stop by.\n\nEarn money to buy more plots, animals, stations and helpers. Selling also earns XP, and every new level unlocks something new.\n\nTap Next for a quick tour. You can open this again with the ? button."],
 		["Crops", "1. Pick a seed on the right side of the screen.\n2. Tap a brown dirt plot to plant it.\n3. When the crop starts bouncing it is ready: tap it to harvest 2.\n\nHarvested plots replant the same seed by themselves. Green plots are locked: tap the one marked \"Buy Plot\" to expand your field.\n\nWheat seeds are free, so you can never get stuck."],
-		["Animals", "Chickens lay eggs and cows give milk (cows unlock at level 3).\n\nWhen an egg or milk bucket floats above an animal, tap the animal to collect it.\n\nBuy more animals from the signs in front of the pen."],
+		["Animals", "Chickens lay eggs, cows give milk (level 3) and pigs give bacon (level 5).\n\nWhen an egg, milk bucket or bacon floats above an animal, tap the animal to collect it.\n\nBuy more animals from the signs in front of the pen."],
 		["Kitchen Stations", "Stations turn raw items into goods that sell for much more. Tap an empty pad to build one, then tap it to start cooking. It keeps cooking by itself while you have ingredients. Tap it when it says READY to collect.\n\n" + "\n".join(recipes)],
 		["Selling", "Cars line up at the farm stand. Each shows what it wants, the price, and how long it will wait.\n\nTap a car to sell. If you don't have what it wants, keep farming: it will wait a while, and new cars ask for things you already have more often."],
-		["Helpers (automation)", "Tired of tapping? Hire helpers in the Upgrades menu. They keep working while you play:\n\n- Scarecrow Farmhand: harvests ripe crops\n- Barn Robot: collects eggs and milk\n- Kitchen Helper: collects and restarts stations\n- Stand Clerk: sells to cars when you have their order\n\nEach helper can be upgraded twice to work faster. With all four, your farm runs itself."],
+		["Helpers (automation)", "Tired of tapping? Hire helpers in the Upgrades menu. They show up on the farm and keep working while you play:\n\n- Scarecrow Farmhand: harvests ripe crops\n- Barn Robot: collects eggs, milk and bacon\n- Kitchen Helper: collects and restarts stations\n- Stand Clerk: sells to cars when you have their order\n\nEach helper can be upgraded twice to work faster. With all four, your farm runs itself."],
 		["Controls & Tips", "- Tap: plant, harvest, collect, build, sell\n- Drag: move the camera\n- + / - buttons (or mouse wheel / pinch): zoom\n- II button: pause, sound, restart\n\nTips: build the Mill early, since flour sells for nearly 4x wheat. Hire the Stand Clerk first so cars never leave unhappy. The game saves by itself."],
 	]
 
@@ -1405,24 +1533,151 @@ func update_helpers(delta: float) -> void:
 					var p: Dictionary = plots[i]
 					if p["open"] and p["crop"] != "" and p["t"] >= CROPS[p["crop"]]["t"]:
 						tap_plot(i)
+						send_helper(h, plot_pos(i) + Vector3(0, 0, 1.3))
 						break
 			"collector":
 				for i in animals.size():
 					if animals[i]["t"] >= ANIMALS[animals[i]["type"]]["t"]:
 						tap_animal(i)
+						send_helper(h, animal_nodes[i]["node"].position + Vector3(0, 0, 0.9))
 						break
 			"chef":
 				for id in STATION_ORDER:
 					var s: Dictionary = stations[id]
 					if s["own"] and (s["ready"] > 0 or (not s["busy"] and station_can_start(id))):
 						tap_station(id)
+						send_helper(h, station_pos(STATION_ORDER.find(id)) + Vector3(0, 0, 1.9))
 						break
 			"seller":
 				for c in cars:
 					var n: Node3D = c["node"]
 					if not c["leaving"] and absf(n.position.x - STAND_X) < 13.0 and have(c["want"]) >= c["qty"]:
 						tap_car(n.get_instance_id())
+						send_helper(h, Vector3(clampf(n.position.x, STAND_X - 1.5, STAND_X + 1.5), 0, 6.5))
 						break
+
+
+# ================= helper bodies =================
+
+func helper_home(h: String) -> Vector3:
+	match h:
+		"farmhand":
+			return Vector3(-16.6, 0, -1.0)
+		"collector":
+			return Vector3(8.4, 0, -8.8)
+		"chef":
+			return Vector3(-5.2, 0, 4.8)
+	return Vector3(STAND_X + 0.6, 0, 6.5)
+
+
+## Spawns a visible body for every hired helper that doesn't have one yet.
+func refresh_helpers() -> void:
+	for h in HELPERS:
+		if upg[h] == 0 or helper_nodes.has(h):
+			continue
+		var n := node_at(self, helper_home(h))
+		var body := node_at(n, Vector3.ZERO)
+		match h:
+			"farmhand":
+				build_scarecrow(body)
+			"collector":
+				build_robot(body, Color(0.45, 0.65, 0.85), Color(0.3, 1.0, 0.6), "basket")
+			"chef":
+				build_robot(body, Color(0.92, 0.92, 0.95), Color(1.0, 0.7, 0.2), "chef")
+			"seller":
+				build_robot(body, Color(0.95, 0.75, 0.25), Color(0.3, 0.8, 1.0), "cap")
+		n.rotation.y = PI if h == "collector" else 0.0
+		helper_nodes[h] = {"node": n, "body": body, "target": n.position}
+
+
+func build_scarecrow(b: Node3D) -> void:
+	var straw := Color(0.95, 0.82, 0.4)
+	cyl(b, 0.06, 0.07, 1.6, Vector3(0, 0.8, 0), WOOD, 8)
+	box(b, Vector3(1.6, 0.08, 0.08), Vector3(0, 1.45, 0), WOOD)
+	box(b, Vector3(0.6, 0.65, 0.34), Vector3(0, 1.35, 0), Color(0.75, 0.2, 0.2))
+	for k in 3:
+		box(b, Vector3(0.62, 0.04, 0.36), Vector3(0, 1.15 + k * 0.2, 0), Color(0.45, 0.1, 0.1))
+	box(b, Vector3(0.62, 0.3, 0.36), Vector3(0, 0.95, 0), Color(0.3, 0.4, 0.7))
+	for x in [-0.6, 0.6]:
+		box(b, Vector3(0.45, 0.2, 0.22), Vector3(x, 1.45, 0), Color(0.75, 0.2, 0.2))
+		cyl(b, 0.0, 0.08, 0.22, Vector3(x * 1.42, 1.45, 0), straw, 6).rotation_degrees.z = 90.0 * signf(x)
+	sph(b, 0.26, Vector3(0, 1.92, 0), Color(0.85, 0.72, 0.5))
+	for x in [-0.09, 0.09]:
+		sph(b, 0.04, Vector3(x, 1.97, 0.23), Color(0.1, 0.1, 0.1))
+	box(b, Vector3(0.16, 0.03, 0.02), Vector3(0, 1.82, 0.25), Color(0.1, 0.1, 0.1))
+	cyl(b, 0.5, 0.5, 0.04, Vector3(0, 2.1, 0), straw, 16)
+	cyl(b, 0.18, 0.24, 0.26, Vector3(0, 2.24, 0), straw, 12)
+	cyl(b, 0.235, 0.235, 0.06, Vector3(0, 2.15, 0), Color(0.75, 0.2, 0.2), 12)
+
+
+## A friendly round robot on a wheel. hat: "basket", "chef" or "cap".
+func build_robot(b: Node3D, c: Color, eye: Color, hat: String) -> void:
+	var steel := Color(0.6, 0.62, 0.66)
+	var dark := Color(0.15, 0.16, 0.2)
+	skin(cyl(b, 0.22, 0.22, 0.18, Vector3(0, 0.22, 0), dark, 16), dark, 0.3).rotation_degrees.z = 90
+	skin(cyl(b, 0.08, 0.08, 0.22, Vector3(0, 0.22, 0), steel, 10), steel, 0.8).rotation_degrees.z = 90
+	skin(cyl(b, 0.12, 0.2, 0.3, Vector3(0, 0.5, 0), steel, 12), steel, 0.8)
+	skin(sph(b, 0.42, Vector3(0, 0.95, 0), c, Vector3(1, 0.95, 0.9)), c, 0.5)
+	skin(cyl(b, 0.3, 0.3, 0.02, Vector3(0, 0.95, 0.36), dark, 16), dark, 0.2).rotation_degrees.x = 90
+	skin(box(b, Vector3(0.22, 0.12, 0.04), Vector3(0, 0.98, 0.38), eye), eye, 0.0, true)
+	skin(sph(b, 0.06, Vector3(-0.07, 1.08, 0.37), eye), eye, 0.0, true)
+	# head
+	skin(cyl(b, 0.08, 0.1, 0.12, Vector3(0, 1.4, 0), steel, 10), steel, 0.8)
+	skin(box(b, Vector3(0.62, 0.42, 0.48), Vector3(0, 1.66, 0), c), c, 0.5)
+	skin(box(b, Vector3(0.5, 0.24, 0.04), Vector3(0, 1.68, 0.25), dark), dark, 0.2)
+	for x in [-0.12, 0.12]:
+		skin(sph(b, 0.065, Vector3(x, 1.68, 0.27), eye), eye, 0.0, true)
+	for x in [-0.33, 0.33]:
+		skin(cyl(b, 0.09, 0.09, 0.06, Vector3(x, 1.66, 0), steel, 12), steel, 0.8).rotation_degrees.z = 90
+	# arms
+	for x in [-1.0, 1.0]:
+		var arm := node_at(b, Vector3(x * 0.42, 1.05, 0))
+		arm.name = "ArmL" if x < 0 else "ArmR"
+		skin(sph(arm, 0.1, Vector3.ZERO, steel), steel, 0.8)
+		skin(cyl(arm, 0.05, 0.05, 0.4, Vector3(x * 0.05, -0.22, 0.05), steel, 8), steel, 0.8)
+		skin(sph(arm, 0.09, Vector3(x * 0.06, -0.45, 0.08), c), c, 0.5)
+	match hat:
+		"basket":
+			skin(cyl(b, 0.012, 0.012, 0.3, Vector3(0, 2.02, 0), steel, 6), steel, 0.8)
+			skin(sph(b, 0.07, Vector3(0, 2.2, 0), eye), eye, 0.0, true)
+			cyl(b, 0.3, 0.24, 0.25, Vector3(0, 0.85, -0.42), WOOD, 12)
+			sph(b, 0.08, Vector3(-0.08, 0.98, -0.42), Color(1, 0.96, 0.88), Vector3(1, 1.3, 1))
+			sph(b, 0.08, Vector3(0.08, 0.98, -0.38), Color(1, 0.96, 0.88), Vector3(1, 1.3, 1))
+		"chef":
+			cyl(b, 0.26, 0.24, 0.2, Vector3(0, 1.97, 0), Color.WHITE, 14)
+			sph(b, 0.3, Vector3(0, 2.15, 0), Color.WHITE, Vector3(1, 0.7, 1))
+			box(b, Vector3(0.5, 0.5, 0.05), Vector3(0, 0.85, 0.4), Color(0.95, 0.4, 0.35))
+		"cap":
+			cyl(b, 0.3, 0.3, 0.14, Vector3(0, 1.94, 0), Color(0.85, 0.2, 0.2), 14)
+			box(b, Vector3(0.4, 0.04, 0.25), Vector3(0, 1.88, 0.3), Color(0.85, 0.2, 0.2))
+			box(b, Vector3(0.5, 0.55, 0.05), Vector3(0, 0.85, 0.4), Color(0.3, 0.55, 0.3))
+
+
+## Points a helper at the spot it just worked on.
+func send_helper(h: String, spot: Vector3) -> void:
+	if helper_nodes.has(h):
+		helper_nodes[h]["target"] = spot
+		bounce(helper_nodes[h]["body"])
+
+
+func update_helper_bodies(delta: float) -> void:
+	for h in helper_nodes:
+		var hn: Dictionary = helper_nodes[h]
+		var n: Node3D = hn["node"]
+		var body: Node3D = hn["body"]
+		var to: Vector3 = hn["target"] - n.position
+		to.y = 0
+		var moving := to.length() > 0.1
+		if moving:
+			n.position += to.normalized() * minf(4.5 * delta, to.length())
+			n.rotation.y = lerp_angle(n.rotation.y, atan2(to.x, to.z), delta * 8.0)
+		body.position.y = (absf(sin(clock * 12.0)) * 0.08 if moving else sin(clock * 2.0) * 0.04)
+		if h == "farmhand":
+			body.rotation.z = sin(clock * 10.0) * 0.12 if moving else 0.0
+			continue
+		var swing := sin(clock * (10.0 if moving else 2.0)) * (0.6 if moving else 0.15)
+		(body.get_node("ArmL") as Node3D).rotation.x = swing
+		(body.get_node("ArmR") as Node3D).rotation.x = -swing
 
 
 func big_button(text: String) -> Button:
