@@ -92,6 +92,7 @@ var animals := []
 var upg := {"farmhand": 0, "collector": 0, "chef": 0, "seller": 0, "fert": 0, "feed": 0, "sign": 0, "fame": 0}
 var muted := false
 var helper_timers := {}
+var collector_next := 0
 var resetting := false
 var pause_panel: PanelContainer
 var help_title: Label
@@ -2197,8 +2198,11 @@ func update_helpers(delta: float) -> void:
 						send_helper(h, plot_pos(i) + Vector3(0, 0, 1.3))
 						break
 			"collector":
-				for i in animals.size():
+				# take turns round the pen so fast chickens can't starve the cows and pigs
+				for k in animals.size():
+					var i := (collector_next + k) % animals.size()
 					if animals[i]["t"] >= ANIMALS[animals[i]["type"]]["t"]:
+						collector_next = i + 1
 						tap_animal(i)
 						send_helper(h, animal_nodes[i]["node"].position + Vector3(0, 0, 0.9))
 						break
